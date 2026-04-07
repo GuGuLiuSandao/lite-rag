@@ -1,3 +1,0 @@
-[console_scripts]
-lite-rag = lite_rag.cli:main
-lite-rag-api = lite_rag.api:run

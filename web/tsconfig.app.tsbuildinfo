@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/layout.tsx","./src/components/ui.tsx","./src/hooks/useasync.ts","./src/lib/api.ts","./src/lib/format.ts","./src/lib/types.ts","./src/pages/kb-detail-page.tsx","./src/pages/kb-list-page.tsx","./src/pages/search-page.tsx"],"version":"5.9.3"}
