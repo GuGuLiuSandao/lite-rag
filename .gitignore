@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+skill/local-lite-rag/.env
+web/node_modules/
+web/dist/
+web/.env
