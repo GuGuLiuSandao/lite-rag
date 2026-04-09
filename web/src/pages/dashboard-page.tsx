@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "../components/chart";
-import { Badge, Modal, PageHeader, Panel, SecondaryButton, Select, StatusMessage } from "../components/ui";
+import { Badge, Modal, PageHeader, Panel, PanelHeader, SecondaryButton, Select, StatusMessage } from "../components/ui";
 import { useAsync } from "../hooks/useAsync";
 import { api } from "../lib/api";
 import { formatTime, truncateText } from "../lib/format";
@@ -168,7 +168,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-7">
       <PageHeader
         eyebrow="Dashboard"
         title="知识库仪表盘"
@@ -243,13 +243,11 @@ export function DashboardPage() {
           </div>
 
           <Panel className="animate-rise-in [animation-delay:60ms]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-dify-text">最近 7 天查询趋势</h2>
-                <p className="text-sm text-dify-subtext">用最近七天的查询量观察检索活跃度变化。</p>
-              </div>
-              <TrendingUp className="h-4 w-4 text-dify-subtext" />
-            </div>
+            <PanelHeader
+              title="最近 7 天查询趋势"
+              description="用最近七天的查询量观察检索活跃度变化。"
+              icon={<TrendingUp className="h-4 w-4" />}
+            />
             {data.query_trend.length === 0 ? (
               <StatusMessage title="暂无趋势数据" description="有查询记录后，这里会展示 7 天趋势。" />
             ) : (
@@ -258,14 +256,13 @@ export function DashboardPage() {
           </Panel>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-            <Panel className="animate-rise-in p-0 [animation-delay:80ms]">
-              <div className="flex items-center justify-between border-b border-dify-border px-5 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-dify-text">最近查询记录</h2>
-                  <p className="text-sm text-dify-subtext">最近 10 次查询的关键词、范围与命中结果数。</p>
-                </div>
-                <Badge>{data.recent_queries.length} rows</Badge>
-              </div>
+              <Panel className="animate-rise-in p-0 [animation-delay:80ms]">
+                <PanelHeader
+                  title="最近查询记录"
+                  description="最近 10 次查询的关键词、范围与命中结果数。"
+                  action={<Badge>{data.recent_queries.length} rows</Badge>}
+                  bordered
+                />
 
               {data.recent_queries.length === 0 ? (
                 <div className="p-5">
@@ -273,30 +270,33 @@ export function DashboardPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-dify-border text-sm">
-                    <thead className="bg-dify-muted/70 text-left text-xs uppercase tracking-[0.08em] text-dify-softText">
+                  <table className="min-w-full divide-y divide-dify-border/60 text-sm">
+                    <thead className="bg-dify-muted/70 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-dify-softText">
                       <tr>
-                        <th className="px-5 py-3 font-medium">时间</th>
-                        <th className="px-5 py-3 font-medium">Query</th>
-                        <th className="px-5 py-3 font-medium">范围</th>
-                        <th className="px-5 py-3 font-medium">模式</th>
-                        <th className="px-5 py-3 font-medium">结果数</th>
+                        <th className="px-5 py-3 font-semibold">时间</th>
+                        <th className="px-5 py-3 font-semibold">Query</th>
+                        <th className="px-5 py-3 font-semibold">范围</th>
+                        <th className="px-5 py-3 font-semibold">模式</th>
+                        <th className="px-5 py-3 font-semibold">结果数</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-dify-border">
+                    <tbody className="divide-y divide-dify-border/60">
                       {data.recent_queries.map((item) => (
-                        <tr key={item.id} className="hover:bg-dify-muted/50">
-                          <td className="whitespace-nowrap px-5 py-3 text-dify-subtext">{formatTime(item.created_at)}</td>
-                          <td className="max-w-[320px] px-5 py-3 font-medium text-dify-text">
-                            <button className="text-left text-dify-text hover:text-dify-blue" onClick={() => onReplayQuery(item.query, item.kb_id, item.mode)}>
+                        <tr key={item.id} className="transition-colors duration-150 hover:bg-dify-muted/55">
+                          <td className="whitespace-nowrap px-5 py-3.5 text-dify-subtext">{formatTime(item.created_at)}</td>
+                          <td className="max-w-[320px] px-5 py-3.5 font-medium text-dify-text">
+                            <button
+                              className="rounded-sm text-left text-dify-text underline-offset-4 transition hover:text-dify-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dify-blue/30"
+                              onClick={() => onReplayQuery(item.query, item.kb_id, item.mode)}
+                            >
                               {truncateText(item.query, 48)}
                             </button>
                           </td>
-                          <td className="px-5 py-3 text-dify-subtext">{item.kb_name || "全部知识库"}</td>
-                          <td className="px-5 py-3">
+                          <td className="px-5 py-3.5 text-dify-subtext">{item.kb_name || "全部知识库"}</td>
+                          <td className="px-5 py-3.5">
                             <Badge className="border-dify-blue/20 bg-dify-blueSoft text-dify-blue">{item.mode}</Badge>
                           </td>
-                          <td className="px-5 py-3 text-dify-subtext">{item.result_count}</td>
+                          <td className="px-5 py-3.5 text-dify-subtext">{item.result_count}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -307,13 +307,11 @@ export function DashboardPage() {
 
             <div className="space-y-4">
               <Panel className="animate-rise-in [animation-delay:120ms]">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-dify-text">Chunk 命中热点</h2>
-                    <p className="text-sm text-dify-subtext">按累计命中次数排序，帮助识别高频内容与热点文档。</p>
-                  </div>
-                  <Activity className="h-4 w-4 text-dify-subtext" />
-                </div>
+                <PanelHeader
+                  title="Chunk 命中热点"
+                  description="按累计命中次数排序，帮助识别高频内容与热点文档。"
+                  icon={<Activity className="h-4 w-4" />}
+                />
 
                 {data.chunk_hits.length === 0 ? (
                   <StatusMessage title="暂无 chunk 命中数据" description="查询结果产生后，这里会出现热点 chunk。" />
@@ -324,21 +322,27 @@ export function DashboardPage() {
                       const width = Math.max((item.hits / maxHits) * 100, 8);
 
                       return (
-                        <article key={item.chunk_id} className="space-y-2 rounded-xl border border-dify-border p-3">
+                        <article
+                          key={item.chunk_id}
+                          className="space-y-2 rounded-xl border border-dify-border p-3 transition-colors duration-150 hover:border-dify-borderStrong hover:bg-dify-muted/55"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <button className="truncate text-left text-sm font-medium text-dify-text hover:text-dify-blue" onClick={() => onOpenChunk(item.chunk_id)}>
+                              <button
+                                className="truncate rounded-sm text-left text-sm font-medium text-dify-text underline-offset-4 transition hover:text-dify-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dify-blue/30"
+                                onClick={() => onOpenChunk(item.chunk_id)}
+                              >
                                 {item.file_name}
                               </button>
                               <p className="mt-1 text-xs text-dify-subtext">
                                 {item.kb_name} · chunk #{item.chunk_index}
                               </p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="inline-flex items-center gap-2">
                               <Badge className={index === 0 ? "border-dify-blue/20 bg-dify-blueSoft text-dify-blue" : undefined}>
                                 {item.hits} hits
                               </Badge>
-                              <SecondaryButton onClick={() => onOpenChunk(item.chunk_id)}>
+                              <SecondaryButton size="sm" onClick={() => onOpenChunk(item.chunk_id)}>
                                 <Eye className="h-4 w-4" />
                                 查看
                               </SecondaryButton>
@@ -351,7 +355,10 @@ export function DashboardPage() {
                           <div className="flex items-center gap-2 text-xs text-dify-subtext">
                             <Badge>{item.kb_name}</Badge>
                             <Badge>{item.file_name}</Badge>
-                            <Link to={`/kbs/${encodeURIComponent(item.kb_id)}`} className="text-dify-blue hover:underline">
+                            <Link
+                              to={`/kbs/${encodeURIComponent(item.kb_id)}`}
+                              className="rounded-sm text-dify-blue underline-offset-4 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dify-blue/30"
+                            >
                               去知识库
                             </Link>
                           </div>
@@ -363,10 +370,7 @@ export function DashboardPage() {
               </Panel>
 
               <Panel className="animate-rise-in [animation-delay:160ms]">
-                <div className="mb-3 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-dify-subtext" />
-                  <h2 className="text-lg font-semibold text-dify-text">运行概况</h2>
-                </div>
+                <PanelHeader title="运行概况" icon={<Activity className="h-4 w-4" />} />
                 <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                   <div className="rounded-xl border border-dify-border bg-dify-muted/60 p-3">
                     <p className="text-xs uppercase tracking-[0.08em] text-dify-softText">平均每库文档数</p>

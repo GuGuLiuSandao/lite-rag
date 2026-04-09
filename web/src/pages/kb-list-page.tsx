@@ -9,6 +9,7 @@ import {
   Input,
   PageHeader,
   Panel,
+  PanelHeader,
   PrimaryButton,
   SecondaryButton,
   StatusMessage,
@@ -76,7 +77,7 @@ export function KBListPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 lg:space-y-7">
       <PageHeader
         eyebrow="Knowledge"
         title="知识库"
@@ -107,7 +108,8 @@ export function KBListPage() {
         </div>
       </Panel>
 
-      <Panel className="p-4">
+      <Panel className="p-4 lg:p-5">
+        <PanelHeader title="知识库列表" description="浏览、搜索并进入知识库详情。" action={<Badge>{filteredKbs.length} results</Badge>} />
         {error ? (
           <StatusMessage
             title="加载失败"
@@ -123,15 +125,20 @@ export function KBListPage() {
         ) : null}
 
         {!error && !loading && filteredKbs.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredKbs.map((kb) => (
               <article
                 key={kb.id}
-                className="rounded-xl border border-dify-border bg-dify-surface/90 p-4 transition hover:-translate-y-0.5 hover:border-dify-borderStrong hover:shadow-sm"
+                className="rounded-xl border border-dify-border bg-dify-surface/90 p-4 transition-colors duration-150 hover:border-dify-borderStrong hover:bg-dify-muted/45"
               >
                 <div className="flex h-full flex-col justify-between gap-4">
                   <div className="space-y-2">
-                    <h3 className="text-[15px] font-semibold text-dify-text">{kb.name}</h3>
+                    <Link
+                      to={`/kbs/${encodeURIComponent(kb.id)}`}
+                      className="inline-block rounded-sm text-[15px] font-semibold text-dify-text underline-offset-4 transition hover:text-dify-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dify-blue/30"
+                    >
+                      {kb.name}
+                    </Link>
                     <p className="line-clamp-2 min-h-[40px] text-sm leading-5 text-dify-subtext">
                       {kb.description || "暂无描述"}
                     </p>
@@ -142,16 +149,18 @@ export function KBListPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2">
                     <Link to={`/kbs/${encodeURIComponent(kb.id)}`}>
-                      <PrimaryButton className="shadow-none">
+                      <PrimaryButton size="sm" className="shadow-none">
                         进入详情
                         <ArrowRight className="h-4 w-4" />
                       </PrimaryButton>
                     </Link>
-                    <DangerButton busy={deletingId === kb.id} onClick={() => onDeleteKB(kb.id, kb.name)}>
+                    <DangerButton size="icon" busy={deletingId === kb.id} onClick={() => onDeleteKB(kb.id, kb.name)}>
                       <Trash2 className="h-4 w-4" />
                     </DangerButton>
+                    </div>
                   </div>
                 </div>
               </article>

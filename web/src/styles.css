@@ -39,20 +39,20 @@
   color-scheme: dark;
   --color-bg: 11 18 30;
   --color-sidebar: 16 24 39;
-  --color-surface: 21 31 49;
-  --color-muted: 26 38 59;
-  --color-border: 45 55 72;
-  --color-border-strong: 71 85 105;
+  --color-surface: 24 35 54;
+  --color-muted: 31 45 67;
+  --color-border: 57 72 98;
+  --color-border-strong: 91 109 138;
   --color-text: 226 232 240;
-  --color-subtext: 148 163 184;
-  --color-soft-text: 100 116 139;
+  --color-subtext: 166 180 201;
+  --color-soft-text: 134 151 176;
   --color-primary: 96 165 250;
   --color-primary-hover: 125 184 255;
   --color-primary-soft: 30 41 59;
   --color-accent: 34 211 238;
   --color-accent-soft: 22 78 99;
   --color-danger: 248 113 113;
-  --color-danger-soft: 69 19 19;
+  --color-danger-soft: 84 28 28;
   --color-overlay: 2 6 23;
   --color-chart-1: 96 165 250;
   --color-chart-2: 34 211 238;
@@ -64,7 +64,7 @@
   --gradient-primary-hover: linear-gradient(135deg, rgb(147 197 253) 0%, rgb(59 130 246) 52%, rgb(34 211 238) 100%);
   --header-aura-left: radial-gradient(circle at top left, rgba(34, 211, 238, 0.22) 0%, rgba(34, 211, 238, 0.12) 24%, rgba(34, 211, 238, 0) 62%);
   --header-aura-right: radial-gradient(circle at top right, rgba(96, 165, 250, 0.2) 0%, rgba(96, 165, 250, 0.1) 22%, rgba(96, 165, 250, 0) 58%);
-  --header-surface: rgba(21, 31, 49, 0.68);
+  --header-surface: rgba(24, 35, 54, 0.74);
   --header-shadow: 0 14px 34px rgba(2, 6, 23, 0.22);
 }
 

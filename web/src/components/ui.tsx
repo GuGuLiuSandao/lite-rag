@@ -27,18 +27,28 @@ export function Button({
   className,
   children,
   busy,
+  size = "md",
   ...props
 }: PropsWithChildren<
   {
     className?: string;
     busy?: boolean;
+    size?: "sm" | "md" | "lg" | "icon";
   } & ButtonHTMLAttributes<HTMLButtonElement>
 >) {
+  const sizeClassName = {
+    sm: "h-8 px-3 text-xs",
+    md: "h-10 px-4 text-sm",
+    lg: "h-11 px-5 text-sm",
+    icon: "h-9 w-9 p-0",
+  }[size];
+
   return (
       <button
         className={clsx(
-          "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition",
-          "disabled:cursor-not-allowed disabled:opacity-60",
+          "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-medium transition duration-150",
+          "focus-visible:outline-none focus-visible:ring-4 active:translate-y-px disabled:cursor-not-allowed disabled:translate-y-0",
+          sizeClassName,
           className,
         )}
         disabled={busy || props.disabled}
@@ -55,6 +65,7 @@ export function PrimaryButton({ className, ...props }: Parameters<typeof Button>
     <Button
       className={clsx(
         "border-dify-blue text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] [background-image:var(--gradient-primary)]",
+        "focus-visible:ring-dify-blue/30 disabled:opacity-70 disabled:shadow-none",
         "hover:border-dify-accent/50 hover:shadow-[0_14px_34px_rgba(8,145,178,0.2)] hover:[background-image:var(--gradient-primary-hover)]",
         className,
       )}
@@ -67,7 +78,8 @@ export function SecondaryButton({ className, ...props }: Parameters<typeof Butto
   return (
     <Button
       className={clsx(
-        "border-dify-border bg-dify-surface text-dify-text hover:border-dify-borderStrong hover:bg-dify-muted",
+        "border-dify-border bg-dify-surface text-dify-text focus-visible:ring-dify-blue/20",
+        "hover:border-dify-borderStrong hover:bg-dify-muted disabled:border-dify-border/70 disabled:bg-dify-muted/40 disabled:text-dify-subtext",
         className,
       )}
       {...props}
@@ -79,7 +91,8 @@ export function DangerButton({ className, ...props }: Parameters<typeof Button>[
   return (
     <Button
       className={clsx(
-        "border-dify-danger/20 bg-dify-surface text-dify-danger hover:bg-dify-dangerSoft",
+        "border-dify-danger/35 bg-dify-dangerSoft/55 text-dify-danger focus-visible:ring-dify-danger/30",
+        "hover:border-dify-danger/45 hover:bg-dify-dangerSoft disabled:border-dify-danger/20 disabled:bg-dify-dangerSoft/35 disabled:text-dify-danger/70",
         className,
       )}
       {...props}
@@ -189,7 +202,7 @@ export function StatusMessage({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-dify-border bg-dify-muted px-4 py-8 text-center">
+    <div className="rounded-xl border border-dify-borderStrong/70 bg-dify-muted/80 px-4 py-8 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <p className="font-medium text-dify-text">{title}</p>
       {description ? <p className="mt-1 text-sm text-dify-subtext">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
@@ -201,12 +214,44 @@ export function Badge({ children, className }: PropsWithChildren<{ className?: s
   return (
     <span
       className={clsx(
-        "inline-flex items-center rounded-full border border-dify-border bg-dify-muted px-2.5 py-1 text-xs text-dify-subtext",
+        "inline-flex items-center rounded-full border border-dify-borderStrong/70 bg-dify-muted/80 px-2.5 py-1 text-xs text-dify-subtext",
         className,
       )}
     >
       {children}
     </span>
+  );
+}
+
+export function PanelHeader({
+  title,
+  description,
+  action,
+  icon,
+  bordered = false,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  icon?: ReactNode;
+  bordered?: boolean;
+}) {
+  return (
+    <div
+      className={clsx(
+        "flex flex-wrap items-start justify-between gap-4",
+        bordered ? "border-b border-dify-border px-5 py-4" : "mb-4",
+      )}
+    >
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-dify-text">{title}</h2>
+          {icon ? <span className="text-dify-subtext">{icon}</span> : null}
+        </div>
+        {description ? <p className="text-sm text-dify-subtext">{description}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
   );
 }
 

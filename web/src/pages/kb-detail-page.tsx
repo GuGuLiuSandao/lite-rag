@@ -10,6 +10,7 @@ import {
   Modal,
   PageHeader,
   Panel,
+  PanelHeader,
   PrimaryButton,
   SecondaryButton,
   StatusMessage,
@@ -292,7 +293,7 @@ export function KBDetailPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 lg:space-y-7">
       <Link to="/" className="inline-flex items-center gap-2 text-sm text-dify-subtext hover:text-dify-text">
         <ArrowLeft className="h-4 w-4" />
         返回知识库首页
@@ -377,7 +378,7 @@ export function KBDetailPage() {
               <div className="overflow-hidden rounded-xl border border-dify-border">
                 <div className="overflow-x-auto">
                   <div className="min-w-[720px]">
-                    <div className="grid grid-cols-[minmax(0,1.8fr)_100px_160px_180px] gap-3 border-b border-dify-border bg-dify-muted px-4 py-3 text-xs font-medium uppercase tracking-[0.08em] text-dify-subtext">
+                    <div className="grid grid-cols-[minmax(0,1.8fr)_100px_160px_180px] gap-3 border-b border-dify-borderStrong/70 bg-dify-muted/70 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-dify-softText">
                       <span className="sticky left-0 bg-dify-muted">Document</span>
                       <span className="hidden md:block">Chunks</span>
                       <span>Updated</span>
@@ -387,12 +388,17 @@ export function KBDetailPage() {
                     {filteredFiles.map((file) => (
                       <article
                         key={file.id}
-                        className="grid grid-cols-[minmax(0,1.8fr)_100px_160px_180px] items-center gap-3 border-b border-dify-border bg-dify-surface px-4 py-3 last:border-b-0"
+                        className="grid grid-cols-[minmax(0,1.8fr)_100px_160px_180px] items-center gap-3 border-b border-dify-border/60 bg-dify-surface px-5 py-3.5 transition-colors duration-150 hover:border-dify-borderStrong hover:bg-dify-muted/55 last:border-b-0"
                       >
                         <div className="sticky left-0 min-w-0 bg-dify-surface">
-                          <p className="truncate text-sm font-medium text-dify-text" title={file.title}>
+                          <button
+                            type="button"
+                            className="truncate rounded-sm text-left text-sm font-medium text-dify-text underline-offset-4 transition hover:text-dify-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dify-blue/30"
+                            title={file.title}
+                            onClick={() => onPreviewFile(file.id, file.title)}
+                          >
                             {file.title}
-                          </p>
+                          </button>
                           <p className="truncate text-xs text-dify-subtext" title={file.source_name}>
                             {file.source_name}
                           </p>
@@ -400,14 +406,14 @@ export function KBDetailPage() {
                         <div className="hidden text-sm text-dify-subtext md:block">{file.chunk_count}</div>
                         <div className="font-mono text-[11px] text-dify-softText">{formatTime(file.updated_at)}</div>
                         <div className="flex justify-end gap-2">
-                          <SecondaryButton type="button" onClick={() => onPreviewChunks(file.id, file.title)}>
+                          <SecondaryButton size="sm" type="button" onClick={() => onPreviewChunks(file.id, file.title)}>
                             Chunks
                           </SecondaryButton>
-                          <SecondaryButton type="button" onClick={() => onPreviewFile(file.id, file.title)}>
+                          <SecondaryButton size="sm" type="button" onClick={() => onPreviewFile(file.id, file.title)}>
                             <Eye className="h-4 w-4" />
                             查看
                           </SecondaryButton>
-                          <DangerButton busy={deletingFileId === file.id} onClick={() => onDeleteFile(file.id, file.title)}>
+                          <DangerButton size="icon" busy={deletingFileId === file.id} onClick={() => onDeleteFile(file.id, file.title)}>
                             <Trash2 className="h-4 w-4" />
                           </DangerButton>
                         </div>
@@ -426,10 +432,7 @@ export function KBDetailPage() {
           <div className="pt-5">
             <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
               <div className="rounded-xl bg-dify-muted p-4 text-sm text-dify-subtext">
-                <div className="mb-3 flex items-center gap-2">
-                  <Pencil className="h-4 w-4 text-dify-blue" />
-                  <span className="font-medium text-dify-text">基础设置</span>
-                </div>
+                <PanelHeader title="基础设置" icon={<Pencil className="h-4 w-4 text-dify-blue" />} />
                 <div className="space-y-2">
                   <div>
                     <div className="mb-1 text-xs uppercase tracking-[0.12em] text-dify-softText">Reference</div>
