@@ -1,7 +1,9 @@
-import { BarChart3, BookOpen, Database, Search, Server } from "lucide-react";
+import { BarChart3, BookOpen, Database, Moon, Search, Server, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { api } from "../lib/api";
+import { SecondaryButton } from "./ui";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -11,13 +13,33 @@ const links = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("theme");
+    if (storedTheme === "light" || storedTheme === "dark") {
+      setTheme(storedTheme);
+      return;
+    }
+
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setTheme(prefersDark ? "dark" : "light");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("theme", theme);
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-dify-bg text-dify-text">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
         <aside className="hidden w-[248px] shrink-0 border-r border-dify-border bg-dify-sidebar px-4 py-5 lg:block">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-dify-blueSoft text-dify-blue">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-dify-accent/25 text-dify-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+              style={{ backgroundImage: "var(--gradient-brand)" }}
+            >
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
@@ -38,13 +60,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                       "animate-rise-in",
                       isActive
-                        ? "bg-dify-surface text-dify-blue shadow-card"
+                        ? "bg-dify-surface text-dify-text shadow-card ring-1 ring-dify-accent/25"
                         : "text-dify-subtext hover:bg-dify-surface hover:text-dify-text",
                     ].join(" ")
                   }
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={location.pathname === link.to ? "h-4 w-4 text-dify-accent" : "h-4 w-4"} />
                   {link.label}
                 </NavLink>
               );
@@ -64,9 +86,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <p className="truncate font-mono text-[11px]">{api.baseUrl}</p>
           </div>
+
+          <div className="mt-6 px-3">
+            <SecondaryButton
+              className="w-full justify-between"
+              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+            >
+              <span>{theme === "light" ? "切换深色" : "切换浅色"}</span>
+              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </SecondaryButton>
+          </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-5 py-6 lg:px-8">{children}</main>
+        <main className="min-w-0 flex-1 px-5 py-6 lg:px-8">
+          <div className="mb-4 flex justify-end lg:hidden">
+            <SecondaryButton onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}>
+              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              {theme === "light" ? "深色模式" : "浅色模式"}
+            </SecondaryButton>
+          </div>
+          {children}
+        </main>
       </div>
     </div>
   );

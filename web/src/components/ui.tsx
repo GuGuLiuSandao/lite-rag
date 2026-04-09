@@ -54,7 +54,8 @@ export function PrimaryButton({ className, ...props }: Parameters<typeof Button>
   return (
     <Button
       className={clsx(
-        "border-dify-blue bg-dify-blue text-white hover:bg-[#1849d6]",
+        "border-dify-blue text-white shadow-[0_10px_28px_rgba(37,99,235,0.22)] [background-image:var(--gradient-primary)]",
+        "hover:border-dify-accent/50 hover:shadow-[0_14px_34px_rgba(8,145,178,0.2)] hover:[background-image:var(--gradient-primary-hover)]",
         className,
       )}
       {...props}
@@ -78,7 +79,7 @@ export function DangerButton({ className, ...props }: Parameters<typeof Button>[
   return (
     <Button
       className={clsx(
-        "border-[#fecdca] bg-dify-surface text-dify-danger hover:bg-dify-dangerSoft",
+        "border-dify-danger/20 bg-dify-surface text-dify-danger hover:bg-dify-dangerSoft",
         className,
       )}
       {...props}
@@ -221,13 +222,22 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div
+      className="relative overflow-hidden rounded-2xl border border-dify-border/70 px-5 py-5 shadow-[var(--header-shadow)]"
+      style={{ backgroundColor: "var(--header-surface)" }}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-100">
+        <div className="absolute inset-0" style={{ backgroundImage: "var(--header-aura-left), var(--header-aura-right)" }} />
+        <div className="absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-dify-accent/25 to-transparent" />
+      </div>
+      <div className="relative flex flex-wrap items-start justify-between gap-4">
       <div className="space-y-2">
-        {eyebrow ? <p className="text-xs font-medium uppercase tracking-[0.14em] text-dify-subtext">{eyebrow}</p> : null}
+        {eyebrow ? <p className="text-xs font-medium uppercase tracking-[0.14em] text-dify-accent/80">{eyebrow}</p> : null}
         <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-dify-text">{title}</h1>
         {description ? <p className="max-w-3xl text-sm leading-6 text-dify-subtext">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
     </div>
   );
 }
@@ -264,7 +274,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/28 p-4 animate-rise-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-dify-overlay/40 p-4 animate-rise-in"
       onClick={onClose}
     >
       <div

@@ -29,7 +29,10 @@ function StatCard({
           <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] text-dify-text">{value}</p>
           <p className="mt-2 text-xs leading-5 text-dify-softText">{detail}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-dify-blueSoft text-dify-blue">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-dify-accent/25 text-dify-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]"
+          style={{ backgroundImage: "var(--gradient-brand)" }}
+        >
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -44,7 +47,7 @@ function TrendLineChart({ points }: { points: DashboardTrendPoint[] }) {
   const chartConfig = {
     queries: {
       label: "查询次数",
-      color: "#1570ef",
+      color: "rgb(var(--color-chart-1))",
     },
   } satisfies ChartConfig;
 
@@ -54,7 +57,7 @@ function TrendLineChart({ points }: { points: DashboardTrendPoint[] }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="rounded-2xl border border-dify-border bg-white p-4">
+        <div className="rounded-2xl border border-dify-border bg-dify-surface p-4">
           <ChartContainer config={chartConfig} className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={points} margin={{ left: 8, right: 8, top: 12, bottom: 8 }} accessibilityLayer>
@@ -75,7 +78,7 @@ function TrendLineChart({ points }: { points: DashboardTrendPoint[] }) {
                       payload={payload?.map((item) => ({
                         value: Array.isArray(item.value) ? item.value.join(", ") : item.value == null ? undefined : String(item.value),
                         name: "查询次数",
-                        color: "#1570ef",
+                        color: "rgb(var(--color-chart-1))",
                       }))}
                       label={label == null ? undefined : String(label)}
                     />
@@ -87,8 +90,8 @@ function TrendLineChart({ points }: { points: DashboardTrendPoint[] }) {
                   name="查询次数"
                   stroke="var(--color-queries)"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: "#1570ef", stroke: "#ffffff", strokeWidth: 2 }}
-                  activeDot={{ r: 4, fill: "#1570ef", stroke: "#ffffff", strokeWidth: 2 }}
+                  dot={{ r: 3, fill: "rgb(var(--color-chart-1))", stroke: "rgb(var(--color-surface))", strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: "rgb(var(--color-chart-1))", stroke: "rgb(var(--color-surface))", strokeWidth: 2 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -101,7 +104,7 @@ function TrendLineChart({ points }: { points: DashboardTrendPoint[] }) {
             <p className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-dify-text">{total}</p>
           </div>
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-dify-border bg-white px-3 py-1.5 text-xs text-dify-subtext">
+            <div className="inline-flex items-center gap-2 rounded-full border border-dify-border bg-dify-surface px-3 py-1.5 text-xs text-dify-subtext">
               <TrendingUp className="h-3.5 w-3.5 text-dify-blue" />
               {delta >= 0 ? `较首日 +${delta}` : `较首日 ${delta}`}
             </div>
@@ -169,7 +172,7 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Dashboard"
         title="知识库仪表盘"
-        description="放在 Knowledge 上方，用来快速查看知识库规模、最近查询记录，以及 chunk 命中热点。"
+        description="查看知识库规模、查询趋势与 chunk 命中热点。"
         action={
           <Badge className="border-dify-blue/20 bg-dify-blueSoft text-dify-blue">
             实时数据视图

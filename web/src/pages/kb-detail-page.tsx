@@ -121,7 +121,7 @@ function renderPreviewContent(content: string) {
       return (
         <blockquote
           key={`${block.type}-${index}`}
-          className="my-3 border-l-2 border-dify-blue bg-white/70 px-4 py-3 text-sm leading-7 text-dify-subtext"
+          className="my-3 border-l-2 border-dify-blue bg-dify-surface/70 px-4 py-3 text-sm leading-7 text-dify-subtext"
         >
           {block.content}
         </blockquote>
@@ -132,7 +132,7 @@ function renderPreviewContent(content: string) {
       return (
         <pre
           key={`${block.type}-${index}`}
-          className="my-4 overflow-x-auto rounded-xl border border-dify-border bg-white px-4 py-3 font-mono text-xs leading-6 text-dify-text"
+          className="my-4 overflow-x-auto rounded-xl border border-dify-border bg-dify-surface px-4 py-3 font-mono text-xs leading-6 text-dify-text"
         >
           {block.content}
         </pre>
@@ -528,7 +528,7 @@ export function KBDetailPage() {
                 <p className="mt-1 text-xs text-dify-subtext">上传后会进入当前知识库并参与检索。</p>
               </div>
               <div className="flex justify-center">
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dify-border bg-dify-surface px-3.5 py-2 text-sm font-medium text-dify-text transition hover:border-dify-borderStrong hover:bg-white">
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dify-border bg-dify-surface px-3.5 py-2 text-sm font-medium text-dify-text transition hover:border-dify-borderStrong hover:bg-dify-muted">
                   <Upload className="h-4 w-4" />
                   选择文件
                   <input

@@ -25,10 +25,10 @@ export function ChartContainer({
   }, {});
 
   return (
-    <div
-      data-chart="true"
-      className={clsx(
-        "[&_.recharts-cartesian-grid-horizontal_line]:stroke-dify-border [&_.recharts-cartesian-axis-tick_text]:fill-[#667085] [&_.recharts-tooltip-cursor]:stroke-dify-border",
+      <div
+        data-chart="true"
+        className={clsx(
+        "[&_.recharts-cartesian-grid-horizontal_line]:stroke-dify-border [&_.recharts-cartesian-axis-tick_text]:fill-dify-subtext [&_.recharts-tooltip-cursor]:stroke-dify-border",
         className,
       )}
       style={style}
@@ -54,12 +54,12 @@ export function ChartTooltipContent({
   }
 
   return (
-    <div className="rounded-xl border border-dify-border bg-white/95 px-3 py-2 shadow-card backdrop-blur">
+    <div className="rounded-xl border border-dify-border bg-dify-surface/95 px-3 py-2 text-dify-text shadow-card backdrop-blur">
       {!hideLabel && label ? <p className="text-[11px] text-dify-softText">{label}</p> : null}
       <div className="mt-1 space-y-1">
         {payload.map((item) => (
           <div key={item.name} className="flex items-center gap-2 text-sm text-dify-text">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || "#1570ef" }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color || "rgb(var(--color-chart-1))" }} />
             <span>{item.name}</span>
             <span className="font-medium">{item.value}</span>
           </div>

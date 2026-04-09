@@ -80,7 +80,7 @@ export function KBListPage() {
       <PageHeader
         eyebrow="Knowledge"
         title="知识库"
-        description="列表优先，操作收在右上角，尽量贴近你给的 Dify 首页节奏。"
+        description="管理知识库并进入详情查看文档与检索数据。"
         action={
           <div className="flex items-center gap-2">
             <SecondaryButton onClick={() => refresh()} busy={loading}>
@@ -127,7 +127,7 @@ export function KBListPage() {
             {filteredKbs.map((kb) => (
               <article
                 key={kb.id}
-                className="rounded-xl border border-slate-200/80 bg-white/90 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm"
+                className="rounded-xl border border-dify-border bg-dify-surface/90 p-4 transition hover:-translate-y-0.5 hover:border-dify-borderStrong hover:shadow-sm"
               >
                 <div className="flex h-full flex-col justify-between gap-4">
                   <div className="space-y-2">
@@ -161,7 +161,7 @@ export function KBListPage() {
       </Panel>
 
       {showCreate ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/28 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dify-overlay/40 p-4">
           <div className="w-full max-w-xl rounded-2xl border border-dify-border bg-dify-surface p-5 shadow-card">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>

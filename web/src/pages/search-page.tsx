@@ -155,7 +155,7 @@ export function SearchPage() {
       <PageHeader
         eyebrow="Search"
         title="检索实验"
-        description="保留现有功能，但统一成与知识库页一致的简洁风格。"
+        description="按关键词检索知识库内容，并查看召回结果。"
       />
 
       <Panel className="animate-rise-in">
@@ -292,13 +292,13 @@ export function SearchPage() {
                   className={[
                     "animate-rise-in rounded-xl border bg-dify-surface p-4",
                     isAfterCutoff
-                      ? "border-[#fecdca] bg-dify-dangerSoft/40"
+                      ? "border-dify-danger/20 bg-dify-dangerSoft/40"
                       : "border-dify-border",
                   ].join(" ")}
                   style={{ animationDelay: `${120 + index * 30}ms` }}
                 >
                   {isCutoffBoundary ? (
-                    <div className="mb-3 rounded-lg border border-[#fecdca] bg-dify-dangerSoft px-3 py-2 text-xs font-medium text-dify-danger">
+                    <div className="mb-3 rounded-lg border border-dify-danger/20 bg-dify-dangerSoft px-3 py-2 text-xs font-medium text-dify-danger">
                       从这里开始出现断崖下跌，后续结果大概率是垃圾候选。
                     </div>
                   ) : null}
@@ -307,17 +307,17 @@ export function SearchPage() {
                     <Badge>{item.file_name}</Badge>
                     <Badge>chunk #{item.chunk_index}</Badge>
                     <Badge
-                      className={
-                        isAfterCutoff
-                          ? "border-[#fecdca] bg-dify-dangerSoft text-dify-danger"
+                        className={
+                          isAfterCutoff
+                          ? "border-dify-danger/20 bg-dify-dangerSoft text-dify-danger"
                           : "border-dify-blue/20 bg-dify-blueSoft text-dify-blue"
-                      }
+                        }
                     >
                       final {formatScore(item.final_score ?? item.score)}
                     </Badge>
                     <Badge>retrieval {formatScore(item.retrieval_score)}</Badge>
                     {isAfterCutoff ? (
-                      <Badge className="border-[#fecdca] bg-dify-dangerSoft text-dify-danger">
+                      <Badge className="border-dify-danger/20 bg-dify-dangerSoft text-dify-danger">
                         garbage candidate
                       </Badge>
                     ) : null}
