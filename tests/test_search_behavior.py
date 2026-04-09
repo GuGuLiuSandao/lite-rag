@@ -48,6 +48,7 @@ class StubQuery:
                 "chunk_index": 0,
                 "text": "hard takeoff",
                 "_score": 0.8,
+                "_distance": 0.2,
             }
         ]
 
@@ -95,6 +96,9 @@ def test_hybrid_search_uses_explicit_vector_and_text_builder(tmp_path) -> None:
     assert "kb_id = '" in table.query.where_value
     assert table.query.limit_value == 5
     assert results[0]["score"] == 0.8
+    assert results[0]["final_score"] == 0.8
+    assert results[0]["retrieval_score"] == 0.8
+    assert results[0]["rerank_score"] is None
 
 
 def test_reranker_failure_falls_back_to_base_scores(tmp_path) -> None:
@@ -117,7 +121,10 @@ def test_reranker_failure_falls_back_to_base_scores(tmp_path) -> None:
         final_top_k=2,
     )
 
-    assert results[0]["score"] == 0.8
+    assert results[0]["score"] == 0.2
+    assert results[0]["final_score"] == 0.2
+    assert results[0]["retrieval_score"] == 0.2
+    assert results[0]["rerank_score"] is None
     assert store._reranker_unavailable is True
 
 
@@ -142,6 +149,9 @@ def test_reranker_scores_override_base_scores_when_available(tmp_path) -> None:
     )
 
     assert results[0]["score"] == 1.23
+    assert results[0]["final_score"] == 1.23
+    assert results[0]["retrieval_score"] == 0.2
+    assert results[0]["rerank_score"] == 1.23
 
 
 def test_search_can_disable_reranker_per_request(tmp_path) -> None:
@@ -165,4 +175,7 @@ def test_search_can_disable_reranker_per_request(tmp_path) -> None:
         final_top_k=2,
     )
 
-    assert results[0]["score"] == 0.8
+    assert results[0]["score"] == 0.2
+    assert results[0]["final_score"] == 0.2
+    assert results[0]["retrieval_score"] == 0.2
+    assert results[0]["rerank_score"] is None

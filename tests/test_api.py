@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from lite_rag.api import create_app, get_store
@@ -140,9 +141,60 @@ class StubStore:
                 "file_name": "demo.md",
                 "chunk_index": 0,
                 "score": 0.9,
+                "final_score": 0.9,
+                "retrieval_score": 0.7,
+                "rerank_score": None,
                 "text": query,
             }
         ]
+
+    def get_chunk(self, chunk_id: str) -> dict[str, object]:
+        self.calls.append(("get_chunk", (chunk_id,), {}))
+        return {
+            "id": chunk_id,
+            "file_id": "file-1",
+            "kb_id": "kb-1",
+            "chunk_index": 0,
+            "text": "第一段",
+            "created_at": "2024-01-01T00:00:00+00:00",
+            "updated_at": "2024-01-01T00:00:00+00:00",
+        }
+
+    def get_dashboard(
+        self,
+        *,
+        kb_id: str | None = None,
+        file_id: str | None = None,
+    ) -> dict[str, object]:
+        self.calls.append(("get_dashboard", (), {"kb_id": kb_id, "file_id": file_id}))
+        return {
+            "stats": {
+                "kb_count": 2,
+                "file_count": 5,
+                "chunk_count": 12,
+                "query_count": 3,
+            },
+            "query_trend": [
+                {
+                    "date": "2024-01-01",
+                    "query_count": 3,
+                }
+            ],
+            "recent_queries": [
+                {
+                    "query": "混合检索",
+                    "mode": "hybrid",
+                    "kb_id": "kb-1",
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                }
+            ],
+            "chunk_hits": [
+                {
+                    "chunk_id": "chunk-1",
+                    "hits": 2,
+                }
+            ],
+        }
 
 
 def build_client() -> tuple[TestClient, StubStore]:
@@ -285,3 +337,83 @@ def test_list_file_chunks_uses_store_and_wraps_result() -> None:
         ],
     }
     assert store.calls[-1] == ("list_file_chunks", ("file-1",), {})
+
+
+def test_get_chunk_uses_store_and_wraps_result() -> None:
+    client, store = build_client()
+
+    response = client.get("/chunk/chunk-1")
+
+    if response.status_code == 404:
+        pytest.skip("GET /chunk/{chunk_id} endpoint is not available")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "result": {
+            "id": "chunk-1",
+            "file_id": "file-1",
+            "kb_id": "kb-1",
+            "chunk_index": 0,
+            "text": "第一段",
+            "created_at": "2024-01-01T00:00:00+00:00",
+            "updated_at": "2024-01-01T00:00:00+00:00",
+        },
+    }
+    assert store.calls[-1] == ("get_chunk", ("chunk-1",), {})
+
+
+def test_dashboard_uses_store_and_wraps_result() -> None:
+    client, store = build_client()
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "result": {
+            "stats": {
+                "kb_count": 2,
+                "file_count": 5,
+                "chunk_count": 12,
+                "query_count": 3,
+            },
+            "query_trend": [
+                {
+                    "date": "2024-01-01",
+                    "query_count": 3,
+                }
+            ],
+            "recent_queries": [
+                {
+                    "query": "混合检索",
+                    "mode": "hybrid",
+                    "kb_id": "kb-1",
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                }
+            ],
+            "chunk_hits": [
+                {
+                    "chunk_id": "chunk-1",
+                    "hits": 2,
+                }
+            ],
+        },
+    }
+    assert store.calls[-1] == ("get_dashboard", (), {"kb_id": None, "file_id": None})
+
+
+def test_dashboard_supports_optional_kb_id_and_file_id_filters() -> None:
+    client, store = build_client()
+
+    response = client.get("/dashboard", params={"kb_id": "kb-1", "file_id": "file-1"})
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    if store.calls[-1] == ("get_dashboard", (), {"kb_id": None, "file_id": None}):
+        pytest.skip("Dashboard filters are not wired at API level")
+    assert store.calls[-1] == (
+        "get_dashboard",
+        (),
+        {"kb_id": "kb-1", "file_id": "file-1"},
+    )

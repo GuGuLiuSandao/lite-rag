@@ -113,6 +113,14 @@ When changing Python logic:
 2. Run `python -m pytest` for broader changes crossing module boundaries
 3. Prefer targeted verification before expensive end-to-end flows
 
+### Local dev server restart policy
+
+- After any code change that affects the backend API or the web frontend, agents should default to restarting the relevant local dev servers without waiting for an extra user instruction
+- In this repository, the default expectation is to restart both backend and frontend after modifications unless the user explicitly says not to
+- Backend default restart command: `python -m uvicorn lite_rag.api:app --host 127.0.0.1 --port 8000`
+- Frontend default restart command (from `web/`): `npm run dev -- --host 127.0.0.1 --port 5173`
+- After restart, verify the backend health or relevant endpoint and confirm the frontend dev server process is running
+
 ## Code style guidelines
 
 These conventions are inferred from the current codebase and should be preserved.

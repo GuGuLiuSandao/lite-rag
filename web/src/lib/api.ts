@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  DashboardPayload,
   FileContentPayload,
   FileChunk,
   KBFile,
@@ -52,6 +53,26 @@ export const api = {
 
   listKnowledgeBases(): Promise<KnowledgeBase[]> {
     return request<KnowledgeBase[]>("/kb");
+  },
+
+  getDashboard(): Promise<DashboardPayload> {
+    return request<DashboardPayload>("/dashboard");
+  },
+
+  getFilteredDashboard(payload?: { kb_id?: string; file_id?: string }): Promise<DashboardPayload> {
+    const searchParams = new URLSearchParams();
+    if (payload?.kb_id) {
+      searchParams.set("kb_id", payload.kb_id);
+    }
+    if (payload?.file_id) {
+      searchParams.set("file_id", payload.file_id);
+    }
+    const query = searchParams.toString();
+    return request<DashboardPayload>(`/dashboard${query ? `?${query}` : ""}`);
+  },
+
+  getChunk(chunkId: string): Promise<FileChunk> {
+    return request<FileChunk>(`/chunk/${encodeURIComponent(chunkId)}`);
   },
 
   getKnowledgeBase(kbRef: string): Promise<KnowledgeBase> {

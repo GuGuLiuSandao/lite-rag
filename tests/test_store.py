@@ -238,3 +238,96 @@ def test_metadata_store_persists_chunks_for_file(tmp_path) -> None:
     assert chunks[0]["chunk_index"] == 0
     assert chunks[0]["file_id"] == file_record["id"]
     assert chunks[0]["text"]
+
+
+def test_metadata_store_records_search_queries_and_chunk_hits(tmp_path) -> None:
+    metadata = SQLiteMetadataStore(db_path=tmp_path / "metadata.sqlite3")
+
+    kb = {
+        "id": "kb-1",
+        "name": "产品文档",
+        "description": "",
+        "created_at": "2024-01-01T00:00:00+00:00",
+        "updated_at": "2024-01-01T00:00:00+00:00",
+    }
+    file_record = {
+        "id": "file-1",
+        "kb_id": kb["id"],
+        "kb_name": kb["name"],
+        "title": "demo.md",
+        "source_name": "demo.md",
+        "stored_path": str(tmp_path / "demo.md"),
+        "chunk_count": 1,
+        "created_at": "2024-01-01T00:00:00+00:00",
+        "updated_at": "2024-01-01T00:00:00+00:00",
+    }
+    chunk_record = {
+        "id": "chunk-1",
+        "file_id": file_record["id"],
+        "kb_id": kb["id"],
+        "chunk_index": 0,
+        "text": "第一段",
+        "created_at": "2024-01-01T00:00:00+00:00",
+        "updated_at": "2024-01-01T00:00:00+00:00",
+    }
+
+    metadata.create_kb(kb)
+    metadata.create_file(file_record)
+    metadata.create_chunks([chunk_record])
+    metadata.record_query(
+        {
+            "id": "query-1",
+            "query": "混合检索",
+            "kb_id": kb["id"],
+            "kb_name": kb["name"],
+            "mode": "hybrid",
+            "result_count": 1,
+            "created_at": "2024-01-02T00:00:00+00:00",
+        },
+        [
+            {
+                "chunk_id": "chunk-1",
+                "kb_id": kb["id"],
+                "kb_name": kb["name"],
+                "file_id": file_record["id"],
+                "file_name": file_record["title"],
+                "chunk_index": 0,
+                "hits": 1,
+                "last_hit_at": "2024-01-02T00:00:00+00:00",
+            }
+        ],
+    )
+    metadata.record_query(
+        {
+            "id": "query-2",
+            "query": "第二次检索",
+            "kb_id": kb["id"],
+            "kb_name": kb["name"],
+            "mode": "vector",
+            "result_count": 1,
+            "created_at": "2024-01-03T00:00:00+00:00",
+        },
+        [
+            {
+                "chunk_id": "chunk-1",
+                "kb_id": kb["id"],
+                "kb_name": kb["name"],
+                "file_id": file_record["id"],
+                "file_name": file_record["title"],
+                "chunk_index": 0,
+                "hits": 1,
+                "last_hit_at": "2024-01-03T00:00:00+00:00",
+            }
+        ],
+    )
+
+    dashboard = metadata.get_dashboard()
+
+    assert dashboard["stats"]["kb_count"] == 1
+    assert dashboard["stats"]["file_count"] == 1
+    assert dashboard["stats"]["chunk_count"] == 1
+    assert dashboard["stats"]["query_count"] == 2
+    assert dashboard["stats"]["total_chunk_hits"] == 2
+    assert dashboard["recent_queries"][0]["query"] == "第二次检索"
+    assert dashboard["chunk_hits"][0]["chunk_id"] == "chunk-1"
+    assert dashboard["chunk_hits"][0]["hits"] == 2

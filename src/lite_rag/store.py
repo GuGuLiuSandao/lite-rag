@@ -150,6 +150,17 @@ class LiteRAGStore:
     def list_file_chunks(self, file_id: str) -> list[dict[str, Any]]:
         return self._metadata.list_file_chunks(file_id)
 
+    def get_chunk(self, chunk_id: str) -> dict[str, Any]:
+        return self._metadata.get_chunk(chunk_id)
+
+    def get_dashboard(
+        self,
+        *,
+        kb_id: str | None = None,
+        file_id: str | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        return self._metadata.get_dashboard(kb_id=kb_id, file_id=file_id)
+
     def add_file(
         self, kb_ref: str, source_path: str, title: str | None = None
     ) -> dict[str, Any]:
@@ -395,14 +406,40 @@ class LiteRAGStore:
 
         results = query_builder.limit(recall_top_k).to_list()
         if not results:
+            self._record_search(
+                query=query,
+                mode=normalized_mode,
+                kb_id=kb_id,
+                kb_name=None if kb_id is None else self._metadata.get_kb(kb_id)["name"],
+                results=[],
+            )
             return []
+
+        retrieval_results = [
+            self._normalize_result(
+                item,
+                final_score=self._get_retrieval_score(item, normalized_mode),
+                retrieval_score=self._get_retrieval_score(item, normalized_mode),
+                rerank_score=None,
+            )
+            for item in results
+        ]
 
         reranker = self._get_reranker(enabled=enable_reranker)
         if reranker is None:
-            return [
-                self._normalize_result(item, score=item.get("_score"))
-                for item in results[:final_top_k]
-            ]
+            final_results = retrieval_results[:final_top_k]
+            self._record_search(
+                query=query,
+                mode=normalized_mode,
+                kb_id=kb_id,
+                kb_name=None
+                if kb_id is None
+                else final_results[0].get("kb_name")
+                if final_results
+                else self._metadata.get_kb(kb_id)["name"],
+                results=final_results,
+            )
+            return final_results
 
         texts = [item["text"] for item in results]
         pairs = [[query, text] for text in texts]
@@ -412,20 +449,79 @@ class LiteRAGStore:
                 scores = [scores]
         except Exception:
             self._reranker_unavailable = True
-            return [
-                self._normalize_result(item, score=item.get("_score"))
-                for item in results[:final_top_k]
-            ]
+            return retrieval_results[:final_top_k]
 
         rescored = []
         for item, score in zip(results, scores):
-            rescored.append(self._normalize_result(item, score=score))
+            retrieval_score = self._get_retrieval_score(item, normalized_mode)
+            rescored.append(
+                self._normalize_result(
+                    item,
+                    final_score=score,
+                    retrieval_score=retrieval_score,
+                    rerank_score=score,
+                )
+            )
 
-        rescored.sort(key=lambda item: item["score"], reverse=True)
-        return rescored[:final_top_k]
+        rescored.sort(key=lambda item: item["final_score"], reverse=True)
+        final_results = rescored[:final_top_k]
+        self._record_search(
+            query=query,
+            mode=normalized_mode,
+            kb_id=kb_id,
+            kb_name=None
+            if kb_id is None
+            else final_results[0].get("kb_name")
+            if final_results
+            else self._metadata.get_kb(kb_id)["name"],
+            results=final_results,
+        )
+        return final_results
+
+    def _record_search(
+        self,
+        *,
+        query: str,
+        mode: str,
+        kb_id: str | None,
+        kb_name: str | None,
+        results: list[dict[str, Any]],
+    ) -> None:
+        now = utc_now()
+        self._metadata.record_query(
+            {
+                "id": str(uuid.uuid4()),
+                "query": query,
+                "kb_id": kb_id,
+                "kb_name": kb_name,
+                "mode": mode,
+                "result_count": len(results),
+                "created_at": now,
+            },
+            [
+                {
+                    "chunk_id": item["chunk_id"],
+                    "kb_id": item["kb_id"],
+                    "kb_name": item["kb_name"],
+                    "file_id": item["file_id"],
+                    "file_name": item["file_name"],
+                    "chunk_index": item["chunk_index"],
+                    "hits": 1,
+                    "last_hit_at": now,
+                }
+                for item in results
+                if item.get("chunk_id")
+            ],
+        )
 
     @staticmethod
-    def _normalize_result(item: dict[str, Any], score: float | None) -> dict[str, Any]:
+    def _normalize_result(
+        item: dict[str, Any],
+        *,
+        final_score: float | None,
+        retrieval_score: float | None,
+        rerank_score: float | None,
+    ) -> dict[str, Any]:
         return {
             "chunk_id": item.get("id"),
             "kb_id": item.get("kb_id"),
@@ -433,9 +529,19 @@ class LiteRAGStore:
             "file_id": item.get("file_id"),
             "file_name": item.get("file_name"),
             "chunk_index": item.get("chunk_index"),
-            "score": score,
+            "score": final_score,
+            "final_score": final_score,
+            "retrieval_score": retrieval_score,
+            "rerank_score": rerank_score,
             "text": item.get("text"),
         }
+
+    @staticmethod
+    def _get_retrieval_score(item: dict[str, Any], mode: str) -> float | None:
+        if mode == "vector":
+            return item.get("_distance", item.get("_score", item.get("score")))
+
+        return item.get("_score", item.get("score", item.get("_relevance_score")))
 
     @staticmethod
     def _escape_sql(value: str) -> str:

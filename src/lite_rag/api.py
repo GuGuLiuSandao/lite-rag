@@ -65,6 +65,17 @@ def create_app() -> FastAPI:
     def health() -> HealthResponse:
         return HealthResponse(result={"status": "ok"})
 
+    @app.get("/dashboard", response_model=APIResponse)
+    def get_dashboard(
+        kb_id: str | None = Query(default=None),
+        file_id: str | None = Query(default=None),
+        store: LiteRAGStore = Depends(get_store),
+    ) -> APIResponse:
+        try:
+            return _ok(store.get_dashboard(kb_id=kb_id, file_id=file_id))
+        except Exception as exc:
+            _translate_error(exc)
+
     @app.post("/kb", response_model=APIResponse)
     def create_kb(
         payload: CreateKBRequest, store: LiteRAGStore = Depends(get_store)
@@ -202,6 +213,15 @@ def create_app() -> FastAPI:
     ) -> APIResponse:
         try:
             return _ok(store.list_file_chunks(file_id))
+        except Exception as exc:
+            _translate_error(exc)
+
+    @app.get("/chunk/{chunk_id}", response_model=APIResponse)
+    def get_chunk(
+        chunk_id: str, store: LiteRAGStore = Depends(get_store)
+    ) -> APIResponse:
+        try:
+            return _ok(store.get_chunk(chunk_id))
         except Exception as exc:
             _translate_error(exc)
 

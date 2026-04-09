@@ -1,6 +1,7 @@
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   Badge,
@@ -24,7 +25,68 @@ const MODES: Array<{ mode: SearchMode; description: string }> = [
 
 type RerankMode = "default" | "on" | "off";
 
+function formatScore(value: number | null): string {
+  return value == null ? "-" : value.toFixed(4);
+}
+
+function getDisplayScore(item: SearchResultItem): number | null {
+  return item.rerank_score ?? item.final_score ?? item.score;
+}
+
+function getCliffMetrics(results: SearchResultItem[]): {
+  cutoffIndex: number | null;
+  maxDrop: number | null;
+  spread: number | null;
+  ratio: number | null;
+} {
+  if (results.length < 2) {
+    return { cutoffIndex: null, maxDrop: null, spread: null, ratio: null };
+  }
+
+  let cutoffIndex: number | null = null;
+  let maxDrop = 0;
+
+  for (let index = 0; index < results.length - 1; index += 1) {
+    const current = getDisplayScore(results[index]);
+    const next = getDisplayScore(results[index + 1]);
+    if (current == null || next == null) {
+      continue;
+    }
+
+    const drop = current - next;
+    if (drop > maxDrop) {
+      maxDrop = drop;
+      cutoffIndex = index;
+    }
+  }
+
+  if (cutoffIndex == null || maxDrop <= 0) {
+    return { cutoffIndex: null, maxDrop: null, spread: null, ratio: null };
+  }
+
+  const headScore = getDisplayScore(results[0]);
+  const tailItem = results[results.length - 1];
+  const tailScore = tailItem ? getDisplayScore(tailItem) : null;
+  if (headScore == null || tailScore == null) {
+    return { cutoffIndex: null, maxDrop: null, spread: null, ratio: null };
+  }
+
+  const spread = headScore - tailScore;
+  if (spread <= 0) {
+    return { cutoffIndex: null, maxDrop: null, spread: null, ratio: null };
+  }
+
+  const ratio = maxDrop / spread;
+  return {
+    cutoffIndex: maxDrop >= spread * 0.45 ? cutoffIndex : null,
+    maxDrop,
+    spread,
+    ratio,
+  };
+}
+
 export function SearchPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [kbRef, setKbRef] = useState("");
   const [mode, setMode] = useState<SearchMode>("hybrid");
@@ -37,6 +99,20 @@ export function SearchPage() {
 
   const kbState = useAsync(() => api.listKnowledgeBases(), []);
   const kbs = useMemo<KnowledgeBase[]>(() => kbState.data ?? [], [kbState.data]);
+  const cliffMetrics = useMemo(() => getCliffMetrics(results), [results]);
+  const cliffCutoffIndex = cliffMetrics.cutoffIndex;
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("query") ?? "";
+    const nextKb = searchParams.get("kb") ?? "";
+    const nextMode = searchParams.get("mode") as SearchMode | null;
+
+    setQuery(nextQuery);
+    setKbRef(nextKb);
+    if (nextMode && ["vector", "fts", "hybrid"].includes(nextMode)) {
+      setMode(nextMode);
+    }
+  }, [searchParams]);
 
   async function onSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +132,17 @@ export function SearchPage() {
         final_top_k: finalTopK,
       });
       setResults(value);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("query", query.trim());
+        if (kbRef) {
+          next.set("kb", kbRef);
+        } else {
+          next.delete("kb");
+        }
+        next.set("mode", mode);
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
@@ -162,7 +249,15 @@ export function SearchPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-dify-text">结果</h2>
-            <p className="text-sm text-dify-subtext">共 {results.length} 条结果</p>
+            <p className="text-sm text-dify-subtext">
+              共 {results.length} 条结果 · 排序依据 {rerankMode === "off" ? "retrieval" : "final"}
+            </p>
+            {cliffMetrics.maxDrop != null && cliffMetrics.spread != null && cliffMetrics.ratio != null ? (
+              <p className="mt-1 text-xs text-dify-subtext">
+                最大断崖 {formatScore(cliffMetrics.maxDrop)} / 总跨度 {formatScore(cliffMetrics.spread)} /
+                占比 {(cliffMetrics.ratio * 100).toFixed(1)}% · 阈值 45%
+              </p>
+            ) : null}
           </div>
           <Badge className="gap-1">
             <SlidersHorizontal className="h-3 w-3" />
@@ -187,23 +282,50 @@ export function SearchPage() {
 
         {!error && !searching && results.length > 0 ? (
           <div className="space-y-3">
-            {results.map((item, index) => (
-              <article
-                key={item.chunk_id}
-                className="animate-rise-in rounded-xl border border-dify-border bg-dify-surface p-4"
-                style={{ animationDelay: `${120 + index * 30}ms` }}
-              >
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-dify-subtext">
-                  <Badge>{item.kb_name}</Badge>
-                  <Badge>{item.file_name}</Badge>
-                  <Badge>chunk #{item.chunk_index}</Badge>
-                  <Badge className="border-dify-blue/20 bg-dify-blueSoft text-dify-blue">
-                    score {item.score?.toFixed(4) ?? "-"}
-                  </Badge>
-                </div>
-                <p className="text-sm leading-6 text-dify-text">{truncateText(item.text, 340)}</p>
-              </article>
-            ))}
+            {results.map((item, index) => {
+              const isAfterCutoff = cliffCutoffIndex != null && index > cliffCutoffIndex;
+              const isCutoffBoundary = cliffCutoffIndex != null && index === cliffCutoffIndex + 1;
+
+              return (
+                <article
+                  key={item.chunk_id}
+                  className={[
+                    "animate-rise-in rounded-xl border bg-dify-surface p-4",
+                    isAfterCutoff
+                      ? "border-[#fecdca] bg-dify-dangerSoft/40"
+                      : "border-dify-border",
+                  ].join(" ")}
+                  style={{ animationDelay: `${120 + index * 30}ms` }}
+                >
+                  {isCutoffBoundary ? (
+                    <div className="mb-3 rounded-lg border border-[#fecdca] bg-dify-dangerSoft px-3 py-2 text-xs font-medium text-dify-danger">
+                      从这里开始出现断崖下跌，后续结果大概率是垃圾候选。
+                    </div>
+                  ) : null}
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-dify-subtext">
+                    <Badge>{item.kb_name}</Badge>
+                    <Badge>{item.file_name}</Badge>
+                    <Badge>chunk #{item.chunk_index}</Badge>
+                    <Badge
+                      className={
+                        isAfterCutoff
+                          ? "border-[#fecdca] bg-dify-dangerSoft text-dify-danger"
+                          : "border-dify-blue/20 bg-dify-blueSoft text-dify-blue"
+                      }
+                    >
+                      final {formatScore(item.final_score ?? item.score)}
+                    </Badge>
+                    <Badge>retrieval {formatScore(item.retrieval_score)}</Badge>
+                    {isAfterCutoff ? (
+                      <Badge className="border-[#fecdca] bg-dify-dangerSoft text-dify-danger">
+                        garbage candidate
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <p className="text-sm leading-6 text-dify-text">{truncateText(item.text, 340)}</p>
+                </article>
+              );
+            })}
           </div>
         ) : null}
       </Panel>

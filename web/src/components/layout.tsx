@@ -1,10 +1,11 @@
-import { BookOpen, Database, Search, Server } from "lucide-react";
+import { BarChart3, BookOpen, Database, Search, Server } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { api } from "../lib/api";
 
 const links = [
-  { to: "/", label: "Knowledge", icon: Database },
+  { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { to: "/kbs", label: "Knowledge", icon: Database },
   { to: "/search", label: "Search", icon: Search },
 ];
 
@@ -53,7 +54,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mt-8 px-3 text-xs text-dify-softText">
             <div className="mb-1 flex items-center gap-2">
               <Server className="h-3.5 w-3.5" />
-              <span>{location.pathname === "/search" ? "检索实验页" : "知识库总览与详情"}</span>
+              <span>
+                {location.pathname === "/search"
+                  ? "检索实验页"
+                  : location.pathname === "/dashboard"
+                    ? "知识库总览仪表盘"
+                    : "知识库总览与详情"}
+              </span>
             </div>
             <p className="truncate font-mono text-[11px]">{api.baseUrl}</p>
           </div>
