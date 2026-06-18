@@ -488,31 +488,34 @@ class LiteRAGStore:
         results: list[dict[str, Any]],
     ) -> None:
         now = utc_now()
-        self._metadata.record_query(
-            {
-                "id": str(uuid.uuid4()),
-                "query": query,
-                "kb_id": kb_id,
-                "kb_name": kb_name,
-                "mode": mode,
-                "result_count": len(results),
-                "created_at": now,
-            },
-            [
+        try:
+            self._metadata.record_query(
                 {
-                    "chunk_id": item["chunk_id"],
-                    "kb_id": item["kb_id"],
-                    "kb_name": item["kb_name"],
-                    "file_id": item["file_id"],
-                    "file_name": item["file_name"],
-                    "chunk_index": item["chunk_index"],
-                    "hits": 1,
-                    "last_hit_at": now,
-                }
-                for item in results
-                if item.get("chunk_id")
-            ],
-        )
+                    "id": str(uuid.uuid4()),
+                    "query": query,
+                    "kb_id": kb_id,
+                    "kb_name": kb_name,
+                    "mode": mode,
+                    "result_count": len(results),
+                    "created_at": now,
+                },
+                [
+                    {
+                        "chunk_id": item["chunk_id"],
+                        "kb_id": item["kb_id"],
+                        "kb_name": item["kb_name"],
+                        "file_id": item["file_id"],
+                        "file_name": item["file_name"],
+                        "chunk_index": item["chunk_index"],
+                        "hits": 1,
+                        "last_hit_at": now,
+                    }
+                    for item in results
+                    if item.get("chunk_id")
+                ],
+            )
+        except Exception:
+            pass
 
     @staticmethod
     def _normalize_result(
