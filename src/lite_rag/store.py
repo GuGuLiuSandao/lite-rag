@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 import shutil
 import uuid
 from pathlib import Path
@@ -10,7 +13,12 @@ import lancedb
 from .config import LiteRAGConfig
 from .metadata import SQLiteMetadataStore
 from .models import build_chunk_model
+from .providers import create_embedding, create_reranker
 from .utils import chunk_text, read_text_file, utc_now
+
+
+logger = logging.getLogger(__name__)
+EMBEDDING_METADATA_KEY = b"lite_rag.embedding"
 
 
 class LiteRAGStore:
@@ -30,9 +38,7 @@ class LiteRAGStore:
 
     def _get_embed_model(self):
         if self._embed_model is None:
-            from sentence_transformers import SentenceTransformer
-
-            self._embed_model = SentenceTransformer(self.config.embedding_model_name)
+            self._embed_model = create_embedding(self.config)
         return self._embed_model
 
     def _get_reranker(self, *, enabled: bool | None = None):
@@ -42,13 +48,12 @@ class LiteRAGStore:
 
         if self._reranker is None:
             try:
-                from FlagEmbedding import FlagReranker
-
-                self._reranker = FlagReranker(
-                    self.config.reranker_model_name,
-                    use_fp16=True,
+                self._reranker = create_reranker(self.config)
+            except Exception as exc:
+                logger.warning(
+                    "Reranker unavailable; using retrieval scores (%s)",
+                    type(exc).__name__,
                 )
-            except Exception:
                 self._reranker_unavailable = True
                 return None
         return self._reranker
@@ -68,10 +73,39 @@ class LiteRAGStore:
         if dim is None:
             raise ValueError("Embedding model dimension is unavailable")
 
-        schema = build_chunk_model(dim)
+        schema = build_chunk_model(dim).to_arrow_schema().with_metadata(
+            {EMBEDDING_METADATA_KEY: self._embedding_signature()}
+        )
         self._chunks_table = self._db.create_table(table_name, schema=schema)
         self._chunks_table.create_fts_index("text", replace=True)
         return self._chunks_table
+
+    def _embedding_signature(self) -> bytes:
+        identity = [self.config.embedding_provider, self.config.embedding_model_name]
+        if self.config.embedding_provider == "http":
+            identity.append(self.config.embedding_api_url)
+        return hashlib.sha256(json.dumps(identity).encode("utf-8")).hexdigest().encode()
+
+    def _validate_embedding_index(self, table) -> None:
+        signature = (table.schema.metadata or {}).get(EMBEDDING_METADATA_KEY)
+        if signature is None:
+            # Legacy tables were created without model metadata.
+            if (
+                self.config.embedding_provider == "local"
+                and self.config.embedding_model_name == "BAAI/bge-m3"
+            ):
+                return
+        elif signature == self._embedding_signature():
+            return
+        raise ValueError(
+            "Embedding configuration does not match this index (or legacy model is unknown). "
+            "Use a new LITE_RAG_STORAGE_ROOT and reimport files to rebuild embeddings."
+        )
+
+    def _validate_existing_embedding_index(self) -> None:
+        if self.config.chunks_table_name in self._db.table_names():
+            table = self._db.open_table(self.config.chunks_table_name)
+            self._validate_embedding_index(table)
 
     def list_kbs(self) -> list[dict[str, Any]]:
         return self._metadata.list_kbs()
@@ -165,6 +199,7 @@ class LiteRAGStore:
         self, kb_ref: str, source_path: str, title: str | None = None
     ) -> dict[str, Any]:
         kb_id, kb = self._metadata.resolve_kb(kb_ref)
+        self._validate_existing_embedding_index()
         path = Path(source_path).expanduser().resolve()
         text = read_text_file(path)
         chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
@@ -217,6 +252,8 @@ class LiteRAGStore:
         source_path: str | None = None,
         title: str | None = None,
     ) -> dict[str, Any]:
+        if source_path is not None:
+            self._validate_existing_embedding_index()
         file_record = self._metadata.get_file(file_id)
         kb = self._metadata.get_kb(file_record["kb_id"])
 
@@ -347,6 +384,7 @@ class LiteRAGStore:
     ) -> None:
         model = self._get_embed_model()
         table = self._get_chunks_table()
+        self._validate_embedding_index(table)
         records = self._pending_chunk_records or self._build_chunk_records(
             kb, file_record, chunks
         )
@@ -391,11 +429,13 @@ class LiteRAGStore:
         query_builder = None
 
         if normalized_mode == "vector":
+            self._validate_embedding_index(table)
             query_vector = self._get_embed_model().encode(query)
             query_builder = table.search(query_vector)
         elif normalized_mode == "fts":
             query_builder = table.search(query, query_type="fts")
         else:
+            self._validate_embedding_index(table)
             query_vector = self._get_embed_model().encode(query)
             query_builder = (
                 table.search(query_type="hybrid").vector(query_vector).text(query)
@@ -447,8 +487,19 @@ class LiteRAGStore:
             scores = reranker.compute_score(pairs)
             if isinstance(scores, float):
                 scores = [scores]
-        except Exception:
-            self._reranker_unavailable = True
+        except Exception as exc:
+            logger.warning(
+                "Rerank failed; using retrieval scores (%s)", type(exc).__name__
+            )
+            # HTTP failures may be transient; retry on the next query.
+            self._reranker_unavailable = self.config.reranker_provider == "local"
+            self._record_search(
+                query=query,
+                mode=normalized_mode,
+                kb_id=kb_id,
+                kb_name=None if kb_id is None else self._metadata.get_kb(kb_id)["name"],
+                results=retrieval_results[:final_top_k],
+            )
             return retrieval_results[:final_top_k]
 
         rescored = []

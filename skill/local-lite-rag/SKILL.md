@@ -15,6 +15,7 @@ description: "本地版 serverless 轻量级 RAG：支持知识库 CRUD、文件
 - 本地 LanceDB 向量库 + 全文倒排索引（chunk/vector/fts）
 - SQLite 存储知识库与文件元数据
 - 可选 reranker
+- 向量化和重排分别支持 `local` / `http`，HTTP 接口协议与配置示例见仓库 `README.md`
 - 数据落盘到 `.env` 指定目录，避免 skill 本体膨胀
 
 ## 限制
@@ -40,8 +41,13 @@ LITE_RAG_STORAGE_ROOT=/absolute/path/to/local-lite-rag-data
 ## 安装
 
 ```bash
-pip install -e .
+pip install -e '.[local]'
 ```
+
+仅使用 HTTP 模型服务时运行 `pip install -e .` 即可，无需本地推理依赖。
+原有 `LITE_RAG_EMBED_MODEL` / `LITE_RAG_RERANK_MODEL` 仍然有效。
+HTTP 模式还需配置对应的 `LITE_RAG_EMBED_API_URL` / `LITE_RAG_RERANK_API_URL`，密钥通过对应的 `*_API_KEY` 设置。
+更换向量模型时，使用新的 `LITE_RAG_STORAGE_ROOT` 并重新导入资料；重排模型可独立更换。
 
 ## 用法
 

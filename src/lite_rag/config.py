@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+def load_environment() -> None:
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 
 SUPPORTED_TEXT_EXTENSIONS = {
@@ -41,6 +48,28 @@ class LiteRAGConfig:
     default_mode: str = "hybrid"
     chunk_size: int = 800
     chunk_overlap: int = 120
+    embedding_provider: str = "local"
+    embedding_api_url: str | None = field(default=None, repr=False)
+    embedding_api_key: str | None = field(default=None, repr=False)
+    embedding_batch_size: int = 32
+    reranker_provider: str = "local"
+    reranker_api_url: str | None = field(default=None, repr=False)
+    reranker_api_key: str | None = field(default=None, repr=False)
+    model_api_timeout: float = 30.0
+
+    def __post_init__(self) -> None:
+        for name, provider, url, enabled in (
+            ("EMBED", self.embedding_provider, self.embedding_api_url, True),
+            ("RERANK", self.reranker_provider, self.reranker_api_url, self.enable_reranker),
+        ):
+            if provider not in {"local", "http"}:
+                raise ValueError(f"LITE_RAG_{name}_PROVIDER must be local or http")
+            if enabled and provider == "http" and not url:
+                raise ValueError(f"LITE_RAG_{name}_API_URL is required for http")
+        if self.embedding_batch_size < 1:
+            raise ValueError("LITE_RAG_EMBED_BATCH_SIZE must be positive")
+        if not math.isfinite(self.model_api_timeout) or self.model_api_timeout <= 0:
+            raise ValueError("LITE_RAG_MODEL_API_TIMEOUT must be positive")
 
     @classmethod
     def from_env(cls) -> "LiteRAGConfig":
@@ -69,6 +98,14 @@ class LiteRAGConfig:
             default_mode=os.getenv("LITE_RAG_DEFAULT_MODE", "hybrid"),
             chunk_size=int(os.getenv("LITE_RAG_CHUNK_SIZE", "800")),
             chunk_overlap=int(os.getenv("LITE_RAG_CHUNK_OVERLAP", "120")),
+            embedding_provider=os.getenv("LITE_RAG_EMBED_PROVIDER", "local").lower(),
+            embedding_api_url=os.getenv("LITE_RAG_EMBED_API_URL"),
+            embedding_api_key=os.getenv("LITE_RAG_EMBED_API_KEY"),
+            embedding_batch_size=int(os.getenv("LITE_RAG_EMBED_BATCH_SIZE", "32")),
+            reranker_provider=os.getenv("LITE_RAG_RERANK_PROVIDER", "local").lower(),
+            reranker_api_url=os.getenv("LITE_RAG_RERANK_API_URL"),
+            reranker_api_key=os.getenv("LITE_RAG_RERANK_API_KEY"),
+            model_api_timeout=float(os.getenv("LITE_RAG_MODEL_API_TIMEOUT", "30")),
         )
 
     @staticmethod

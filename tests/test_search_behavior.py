@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lite_rag.config import LiteRAGConfig
+from lite_rag.models import build_chunk_model
 from lite_rag.store import LiteRAGStore
 
 
@@ -55,6 +56,7 @@ class StubQuery:
 
 class StubTable:
     def __init__(self) -> None:
+        self.schema = build_chunk_model(3).to_arrow_schema()
         self.calls: list[tuple[tuple, dict]] = []
         self.query = StubQuery()
 
@@ -179,3 +181,29 @@ def test_search_can_disable_reranker_per_request(tmp_path) -> None:
     assert results[0]["final_score"] == 0.2
     assert results[0]["retrieval_score"] == 0.2
     assert results[0]["rerank_score"] is None
+
+
+def test_http_reranker_retries_after_transient_failure(tmp_path) -> None:
+    store = build_store(tmp_path, enable_reranker=True)
+    store.config.reranker_provider = "http"
+    store._get_chunks_table = lambda: StubTable()
+    store._get_embed_model = lambda: StubEmbedModel()
+    recorded = []
+    store._record_search = lambda **kwargs: recorded.append(kwargs)
+
+    class TransientReranker:
+        calls = 0
+
+        def compute_score(self, pairs):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary failure")
+            return [0.9 for _ in pairs]
+
+    store._reranker = TransientReranker()
+    first = store.search("test", mode="vector", kb_ref="产品文档")
+    second = store.search("test", mode="vector", kb_ref="产品文档")
+    assert first[0]["rerank_score"] is None
+    assert second[0]["rerank_score"] == 0.9
+    assert store._reranker.calls == 2
+    assert len(recorded) == 2

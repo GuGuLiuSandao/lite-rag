@@ -8,6 +8,7 @@ This file is for coding agents that read, modify, test, or review code in this r
 ## Repository overview
 
 - `src/lite_rag/config.py` — environment config, storage paths, supported file types
+- `src/lite_rag/providers.py` — lazy local model loading and HTTP embeddings/rerank adapters
 - `src/lite_rag/store.py` — knowledge base and file CRUD, indexing, retrieval
 - `src/lite_rag/cli.py` — `argparse` CLI entrypoint and JSON output contract
 - `src/lite_rag/utils.py` — file helpers, chunking, JSON, timestamps
@@ -30,7 +31,12 @@ If any of those files are added later, update this document and follow them.
 ## Environment and setup
 
 - Required Python: `>=3.10` from `pyproject.toml`
-- Preferred install: `pip install -e .`
+- Local inference install: `pip install -e '.[local]'`
+- HTTP-only install: `pip install -e .` (no local inference dependencies)
+- CLI/API load repository `.env` without overriding existing environment variables
+- Model providers are independently configurable via `LITE_RAG_EMBED_PROVIDER` / `LITE_RAG_RERANK_PROVIDER` (`local` or `http`)
+- HTTP providers require full `*_API_URL`; optional `*_API_KEY` is sent as a Bearer token
+- Changing embedding provider/model/URL requires a new storage root and reimport; do not bypass index identity checks
 - For the skill wrapper, create `.env` first:
 
 ```bash

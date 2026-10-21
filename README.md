@@ -7,7 +7,8 @@
 - 知识库中文件 CRUD
 - 检索模式：`vector` / `fts` / `hybrid`
 - 本地 LanceDB（chunk/vector/fts）+ SQLite（KB/文件元数据）
-- 默认开启 reranker，可通过环境变量或检索请求开关关闭；依赖 `FlagEmbedding` + `transformers<5`
+- 向量化与重排分别支持本地模型或 HTTP API，默认仍为本地 BGE 模型
+- 默认开启 reranker，可通过环境变量或检索请求开关关闭；本地推理依赖通过 `[local]` 安装
 - skill 封装
 
 暂不支持：
@@ -21,9 +22,19 @@
 
 ## 安装
 
+使用本地模型（保留原有运行方式）：
+
+```bash
+pip install -e '.[local]'
+```
+
+仅使用 HTTP 模型服务时，无需安装 Sentence Transformers、FlagEmbedding 和本地推理依赖：
+
 ```bash
 pip install -e .
 ```
+
+已有环境中的本地依赖不会自动卸载。
 
 ## 启动 API 服务
 
@@ -87,7 +98,13 @@ API 返回格式与 CLI 保持一致：
 
 ## 配置
 
-复制：
+CLI 和 API 都会自动读取仓库根目录的 `.env`，系统环境变量优先。首次配置可复制：
+
+```bash
+cp .env.example .env
+```
+
+Skill 包装还会先读取自身目录下的 `.env`，其值优先于仓库 `.env`：
 
 ```bash
 cp skill/local-lite-rag/.env.example skill/local-lite-rag/.env
@@ -99,6 +116,54 @@ cp skill/local-lite-rag/.env.example skill/local-lite-rag/.env
 LITE_RAG_STORAGE_ROOT=/absolute/path/to/local-lite-rag-data
 LITE_RAG_ENABLE_RERANKER=true
 ```
+
+### 通过通用 HTTP API 调用模型
+
+向量化与重排可以独立选择 `local` 或 `http`，也可以接入不同服务。URL 填完整接口地址，程序不会自动拼接 `/v1` 或路径：
+
+```env
+LITE_RAG_EMBED_PROVIDER=http
+LITE_RAG_EMBED_MODEL=your-embedding-model
+LITE_RAG_EMBED_API_URL=http://127.0.0.1:9000/v1/embeddings
+LITE_RAG_EMBED_API_KEY=
+LITE_RAG_EMBED_BATCH_SIZE=32
+
+LITE_RAG_ENABLE_RERANKER=true
+LITE_RAG_RERANK_PROVIDER=http
+LITE_RAG_RERANK_MODEL=your-reranker-model
+LITE_RAG_RERANK_API_URL=http://127.0.0.1:9000/v1/rerank
+LITE_RAG_RERANK_API_KEY=
+
+LITE_RAG_MODEL_API_TIMEOUT=30
+```
+
+有密钥时使用 `Authorization: Bearer <key>`；无密钥时不发送认证头。改配置后需重启 API，CLI 每次运行读取配置。
+
+向量化接口协议：
+
+```json
+请求：{"model":"your-embedding-model","input":["文本一","文本二"],"encoding_format":"float"}
+响应：{"data":[{"index":0,"embedding":[0.1,0.2]},{"index":1,"embedding":[0.3,0.4]}]}
+```
+
+重排接口协议：
+
+```json
+请求：{"model":"your-reranker-model","query":"问题","documents":["片段一","片段二"],"top_n":2}
+响应：{"results":[{"index":1,"relevance_score":0.9},{"index":0,"relevance_score":0.2}]}
+```
+
+响应必须包含每条输入的结果和从 0 开始的 `index`，返回顺序不限。向量化会分批请求并校验数量、维度和数值；重排失败会记录警告，回退到原始检索结果，HTTP 模式下会在下次查询重试。其他协议的服务需要适配，不能仅凭支持 HTTP 就直接接入。
+
+如果只需要远程向量化，可设置 `LITE_RAG_ENABLE_RERANKER=false`，无需配置重排 API。
+
+### 更换向量模型与已有数据
+
+新建索引会记录向量模型的 provider、模型名与接口地址的签名，阻止其他配置读写该索引的向量，即使维度相同也会拦截。全文检索仍可使用已有索引。
+
+更换向量模型时，设置新的 `LITE_RAG_STORAGE_ROOT` 并重新导入文件。仅更换重排模型或 API 密钥不需要重建索引。当前不提供原地自动重建命令。
+
+历史索引没有模型签名，为兼容原有数据，仅允许默认的本地 `BAAI/bge-m3` 使用它。如果历史数据实际使用了其他模型，应使用新目录重新导入，避免语义空间混用。
 
 ## 直接 CLI 用法
 

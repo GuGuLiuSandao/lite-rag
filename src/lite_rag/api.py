@@ -21,7 +21,7 @@ from .api_models import (
     UpdateFileRequest,
     UpdateKBRequest,
 )
-from .config import LiteRAGConfig
+from .config import LiteRAGConfig, load_environment
 from .store import LiteRAGStore
 
 
@@ -44,6 +44,7 @@ def _translate_error(exc: Exception) -> None:
 
 
 def create_app() -> FastAPI:
+    load_environment()
     app = FastAPI(title="lite-rag", version="0.1.0")
 
     raw_origins = os.getenv("LITE_RAG_API_ALLOW_ORIGINS", "*")

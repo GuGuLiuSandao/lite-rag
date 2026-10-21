@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .config import LiteRAGConfig
+from .config import LiteRAGConfig, load_environment
 from .store import LiteRAGStore
 from .utils import dump_json
 
@@ -109,6 +109,7 @@ def run(args: argparse.Namespace) -> object:
 
 
 def main() -> None:
+    load_environment()
     parser = build_parser()
     args = parser.parse_args()
     try:
