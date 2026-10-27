@@ -30,6 +30,15 @@ function formatScore(value: number | null): string {
   return value == null ? "-" : value.toFixed(4);
 }
 
+function formatDuration(milliseconds: number | null): string {
+  if (milliseconds == null) {
+    return "-";
+  }
+  return milliseconds < 1000
+    ? `${Math.round(milliseconds)} ms`
+    : `${(milliseconds / 1000).toFixed(2)} s`;
+}
+
 function getDisplayScore(item: SearchResultItem): number | null {
   return item.rerank_score ?? item.final_score ?? item.score;
 }
@@ -95,6 +104,7 @@ export function SearchPage() {
   const [recallTopK, setRecallTopK] = useState(20);
   const [finalTopK, setFinalTopK] = useState(5);
   const [searching, setSearching] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,11 +128,14 @@ export function SearchPage() {
 
   async function onSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!query.trim()) {
+    if (searching || !query.trim()) {
       return;
     }
     setSearching(true);
     setError(null);
+    setResults([]);
+    setElapsedMs(null);
+    const startedAt = performance.now();
     try {
       const value = await api.search({
         query: query.trim(),
@@ -148,6 +161,7 @@ export function SearchPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
+      setElapsedMs(performance.now() - startedAt);
       setSearching(false);
     }
   }
@@ -302,10 +316,19 @@ export function SearchPage() {
           }
         />
 
-        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-xl border border-dify-border bg-dify-muted/50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-dify-softText">结果数</p>
             <p className="mt-2 text-lg font-semibold text-dify-text">{results.length}</p>
+          </div>
+          <div
+            className="rounded-xl border border-dify-border bg-dify-muted/50 px-4 py-3"
+            title="从发起请求到收到结果的总耗时，包含网络传输、召回和重排。"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-dify-softText">检索耗时</p>
+            <p className="mt-2 font-mono text-lg font-semibold text-dify-text" aria-live="polite">
+              {searching ? "计时中…" : formatDuration(elapsedMs)}
+            </p>
           </div>
           <div className="rounded-xl border border-dify-border bg-dify-muted/50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-dify-softText">排序依据</p>
