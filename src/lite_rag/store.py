@@ -451,10 +451,24 @@ class LiteRAGStore:
             quoted_ids = ", ".join(f"'{self._escape_sql(item)}'" for item in dict.fromkeys(file_ids))
             filters.append(f"file_id IN ({quoted_ids})")
 
+        has_fts_text = any(char.isalnum() for char in query)
+        if normalized_mode == "fts" and not has_fts_text:
+            self._record_search(
+                query=query,
+                mode=normalized_mode,
+                kb_id=kb_id,
+                kb_name=None if kb_id is None else self._metadata.get_kb(kb_id)["name"],
+                results=[],
+            )
+            return []
+
         table = self._get_chunks_table()
         query_builder = None
+        retrieval_mode = normalized_mode
+        if normalized_mode == "hybrid" and not has_fts_text:
+            retrieval_mode = "vector"
 
-        if normalized_mode == "vector":
+        if retrieval_mode == "vector":
             self._validate_embedding_index(table)
             query_vector = self._get_embed_model().encode(query)
             query_builder = table.search(query_vector)
@@ -484,8 +498,8 @@ class LiteRAGStore:
         retrieval_results = [
             self._normalize_result(
                 item,
-                final_score=self._get_retrieval_score(item, normalized_mode),
-                retrieval_score=self._get_retrieval_score(item, normalized_mode),
+                final_score=self._get_retrieval_score(item, retrieval_mode),
+                retrieval_score=self._get_retrieval_score(item, retrieval_mode),
                 rerank_score=None,
             )
             for item in results
@@ -530,7 +544,7 @@ class LiteRAGStore:
 
         rescored = []
         for item, score in zip(results, scores):
-            retrieval_score = self._get_retrieval_score(item, normalized_mode)
+            retrieval_score = self._get_retrieval_score(item, retrieval_mode)
             rescored.append(
                 self._normalize_result(
                     item,

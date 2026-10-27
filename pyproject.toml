@@ -9,7 +9,7 @@ description = "Local serverless lightweight RAG with knowledge base CRUD and fil
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "lancedb>=0.12.0",
+  "lancedb>=0.40.0,<0.41",
   "httpx>=0.27.0,<1",
   "python-dotenv>=1.0.1",
   "pydantic>=2.7.0",
