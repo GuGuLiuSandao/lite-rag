@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class APIResponse(BaseModel):
@@ -39,6 +39,9 @@ class UpdateFileRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     kb: str | None = None
+    file_ids: list[Annotated[str, Field(strict=True, min_length=1, max_length=128)]] | None = Field(
+        default=None, max_length=1000
+    )
     mode: str | None = None
     enable_reranker: bool | None = None
     recall_top_k: int = 20

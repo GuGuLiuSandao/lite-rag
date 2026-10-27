@@ -30,8 +30,9 @@ class StubQuery:
         self.text_value = value
         return self
 
-    def where(self, value: str):
+    def where(self, value: str, prefilter: bool = True):
         self.where_value = value
+        self.prefilter = prefilter
         return self
 
     def limit(self, value: int):

@@ -421,6 +421,7 @@ class LiteRAGStore:
         query: str,
         *,
         kb_ref: str | None = None,
+        file_ids: list[str] | None = None,
         mode: str | None = None,
         enable_reranker: bool | None = None,
         recall_top_k: int = 20,
@@ -433,6 +434,22 @@ class LiteRAGStore:
         kb_id = None
         if kb_ref is not None:
             kb_id, _ = self._metadata.resolve_kb(kb_ref)
+
+        filters = []
+        if kb_id is not None:
+            filters.append(f"kb_id = '{self._escape_sql(kb_id)}'")
+        if file_ids is not None:
+            if (
+                not isinstance(file_ids, list)
+                or len(file_ids) > 1000
+                or any(not isinstance(item, str) or not 1 <= len(item) <= 128 for item in file_ids)
+            ):
+                raise ValueError("file_ids must contain at most 1000 non-empty string IDs")
+            # An explicit empty scope must never widen to the whole knowledge base.
+            if not file_ids:
+                return []
+            quoted_ids = ", ".join(f"'{self._escape_sql(item)}'" for item in dict.fromkeys(file_ids))
+            filters.append(f"file_id IN ({quoted_ids})")
 
         table = self._get_chunks_table()
         query_builder = None
@@ -450,8 +467,8 @@ class LiteRAGStore:
                 table.search(query_type="hybrid").vector(query_vector).text(query)
             )
 
-        if kb_id is not None:
-            query_builder = query_builder.where(f"kb_id = '{self._escape_sql(kb_id)}'")
+        if filters:
+            query_builder = query_builder.where(" AND ".join(filters), prefilter=True)
 
         results = query_builder.limit(recall_top_k).to_list()
         if not results:

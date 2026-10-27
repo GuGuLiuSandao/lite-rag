@@ -12,6 +12,7 @@ description: "本地版 serverless 轻量级 RAG：支持知识库 CRUD、文件
 - 知识库 CRUD
 - 文件 CRUD
 - 检索模式：`vector` / `fts` / `hybrid`
+- 可通过 `search --file-ids <id> ...` 在召回前限定可见文档，多个文档统一取 Top K；空列表不检索
 - 本地 LanceDB 向量库 + 全文倒排索引（chunk/vector/fts）
 - SQLite 存储知识库与文件元数据
 - 可选 reranker

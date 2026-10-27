@@ -113,6 +113,7 @@ class StubStore:
         query: str,
         *,
         kb_ref: str | None = None,
+        file_ids: list[str] | None = None,
         mode: str | None = None,
         enable_reranker: bool | None = None,
         recall_top_k: int = 20,
@@ -125,6 +126,7 @@ class StubStore:
                 {
                     "query": query,
                     "kb_ref": kb_ref,
+                    "file_ids": file_ids,
                     "mode": mode,
                     "enable_reranker": enable_reranker,
                     "recall_top_k": recall_top_k,
@@ -269,7 +271,8 @@ def test_add_file_passes_expected_arguments() -> None:
     )
 
 
-def test_search_uses_post_payload() -> None:
+@pytest.mark.parametrize("file_ids", [None, [], ["file-1", "file-2"]])
+def test_search_uses_post_payload(file_ids) -> None:
     client, store = build_client()
 
     response = client.post(
@@ -277,6 +280,7 @@ def test_search_uses_post_payload() -> None:
         json={
             "query": "混合检索",
             "kb": "产品文档",
+            "file_ids": file_ids,
             "mode": "hybrid",
             "enable_reranker": False,
             "recall_top_k": 30,
@@ -292,12 +296,21 @@ def test_search_uses_post_payload() -> None:
         {
             "query": "混合检索",
             "kb_ref": "产品文档",
+            "file_ids": file_ids,
             "mode": "hybrid",
             "enable_reranker": False,
             "recall_top_k": 30,
             "final_top_k": 3,
         },
     )
+
+
+@pytest.mark.parametrize("file_ids", ["file-1", [""], [1], [True], ["x" * 129], ["x"] * 1001])
+def test_search_rejects_invalid_document_scope(file_ids) -> None:
+    client, store = build_client()
+    response = client.post("/search", json={"query": "test", "file_ids": file_ids})
+    assert response.status_code == 422
+    assert not store.calls
 
 
 def test_get_file_content_uses_store_and_wraps_result() -> None:

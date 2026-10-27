@@ -150,6 +150,7 @@ export const api = {
   search(payload: {
     query: string;
     kb?: string;
+    file_ids?: string[];
     mode: SearchMode;
     enable_reranker?: boolean;
     recall_top_k?: number;

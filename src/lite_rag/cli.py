@@ -57,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search")
     search_parser.add_argument("--kb")
+    search_parser.add_argument("--file-ids", nargs="*", help="Restrict to these document IDs; an empty list matches nothing")
     search_parser.add_argument("--query", required=True)
     search_parser.add_argument("--mode", choices=["vector", "fts", "hybrid"])
     search_parser.add_argument("--recall-top-k", type=int, default=20)
@@ -100,6 +101,7 @@ def run(args: argparse.Namespace) -> object:
         return store.search(
             query=args.query,
             kb_ref=args.kb,
+            file_ids=args.file_ids,
             mode=args.mode,
             recall_top_k=args.recall_top_k,
             final_top_k=args.final_top_k,

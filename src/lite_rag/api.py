@@ -261,6 +261,7 @@ def create_app() -> FastAPI:
                 store.search(
                     query=payload.query,
                     kb_ref=payload.kb,
+                    file_ids=payload.file_ids,
                     mode=payload.mode,
                     enable_reranker=payload.enable_reranker,
                     recall_top_k=payload.recall_top_k,

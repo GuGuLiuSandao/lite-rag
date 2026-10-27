@@ -221,4 +221,5 @@ These conventions are inferred from the current codebase and should be preserved
 - Do not add dependencies unless necessary
 - If you add a command, toolchain config, or workflow convention, update this file
 - Preserve current behavior around supported text file types
+- Search `file_ids=None` keeps the existing scope; `file_ids=[]` must match nothing. Apply document filters together with KB filters before recall limits and reranking in every search mode.
 - Do not assume OCR, PDF parsing, or image parsing support unless the task explicitly adds it

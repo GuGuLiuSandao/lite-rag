@@ -96,6 +96,35 @@ API 返回格式与 CLI 保持一致：
 - 成功：`{"ok": true, "result": ...}`
 - 失败：`{"ok": false, "error": "..."}`
 
+### 限定可见文档并统一检索
+
+`POST /search` 支持可选的 `file_ids`，对应文件上传或导入结果的 `result.id`：
+
+```json
+{
+  "kb": "项目知识库ID",
+  "file_ids": ["知识卡A的文件ID", "知识卡B的文件ID"],
+  "query": "你的问题",
+  "mode": "hybrid",
+  "recall_top_k": 20,
+  "final_top_k": 5
+}
+```
+
+三种模式都在召回前按文档过滤，随后对可见文档统一召回、重排和取 Top K。
+`kb` 与 `file_ids` 取交集，传入其他库的文件 ID 不会扩大范围。
+省略 `file_ids` 或传 `null` 保留原有行为；传 `[]` 则返回空结果，且不加载模型。
+未知文件 ID 不产生结果。最多接受 1000 个非空字符串 ID。
+业务后端应从 NPC 绑定关系生成文档列表；这个过滤参数本身不提供身份认证。
+
+CLI 同样支持：
+
+```bash
+lite-rag search --kb "项目知识库ID" --file-ids "文件ID-A" "文件ID-B" --query "你的问题"
+```
+
+使用本文 Docker 部署时，上述 HTTP 接口路径加 `/api` 前缀。
+
 ## Docker Compose 部署
 
 需要 Docker Engine / Docker Desktop 和 Docker Compose 2.24+。
