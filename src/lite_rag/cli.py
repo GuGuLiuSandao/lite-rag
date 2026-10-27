@@ -40,6 +40,8 @@ def build_parser() -> argparse.ArgumentParser:
     file_add.add_argument("--kb", required=True)
     file_add.add_argument("--path", required=True)
     file_add.add_argument("--title")
+    file_add.add_argument("--chunk-size", type=int)
+    file_add.add_argument("--chunk-overlap", type=int)
 
     file_list = file_subparsers.add_parser("list")
     file_list.add_argument("--kb")
@@ -51,6 +53,8 @@ def build_parser() -> argparse.ArgumentParser:
     file_update.add_argument("--file-id", required=True)
     file_update.add_argument("--path")
     file_update.add_argument("--title")
+    file_update.add_argument("--chunk-size", type=int)
+    file_update.add_argument("--chunk-overlap", type=int)
 
     file_delete = file_subparsers.add_parser("delete")
     file_delete.add_argument("--file-id", required=True)
@@ -87,13 +91,25 @@ def run(args: argparse.Namespace) -> object:
 
     if args.command == "file":
         if args.file_command == "add":
-            return store.add_file(kb_ref=args.kb, source_path=args.path, title=args.title)
+            return store.add_file(
+                kb_ref=args.kb,
+                source_path=args.path,
+                title=args.title,
+                chunk_size=args.chunk_size,
+                chunk_overlap=args.chunk_overlap,
+            )
         if args.file_command == "list":
             return store.list_files(kb_ref=args.kb)
         if args.file_command == "get":
             return store.get_file(args.file_id)
         if args.file_command == "update":
-            return store.update_file(args.file_id, source_path=args.path, title=args.title)
+            return store.update_file(
+                args.file_id,
+                source_path=args.path,
+                title=args.title,
+                chunk_size=args.chunk_size,
+                chunk_overlap=args.chunk_overlap,
+            )
         if args.file_command == "delete":
             return store.delete_file(args.file_id)
 

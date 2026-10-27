@@ -25,13 +25,18 @@ class UpdateKBRequest(BaseModel):
     description: str | None = None
 
 
-class AddFileRequest(BaseModel):
+class ChunkingOptions(BaseModel):
+    chunk_size: int | None = Field(default=None, strict=True, gt=0)
+    chunk_overlap: int | None = Field(default=None, strict=True, ge=0)
+
+
+class AddFileRequest(ChunkingOptions):
     kb: str
     path: str
     title: str | None = None
 
 
-class UpdateFileRequest(BaseModel):
+class UpdateFileRequest(ChunkingOptions):
     path: str | None = None
     title: str | None = None
 

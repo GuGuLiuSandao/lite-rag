@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .config import SUPPORTED_TEXT_EXTENSIONS
+from .config import SUPPORTED_TEXT_EXTENSIONS, validate_chunking
 
 
 def utc_now() -> str:
@@ -31,6 +31,7 @@ def read_text_file(path: Path) -> str:
 
 
 def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    validate_chunking(chunk_size, chunk_overlap)
     normalized = text.replace("\r\n", "\n").strip()
     if not normalized:
         return []

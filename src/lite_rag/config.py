@@ -35,6 +35,13 @@ SUPPORTED_TEXT_EXTENSIONS = {
 }
 
 
+def validate_chunking(chunk_size: int, chunk_overlap: int) -> None:
+    if type(chunk_size) is not int or chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
+    if type(chunk_overlap) is not int or not 0 <= chunk_overlap < chunk_size:
+        raise ValueError("chunk_overlap must be an integer in [0, chunk_size)")
+
+
 @dataclass(slots=True)
 class LiteRAGConfig:
     storage_root: Path
@@ -58,6 +65,7 @@ class LiteRAGConfig:
     model_api_timeout: float = 30.0
 
     def __post_init__(self) -> None:
+        validate_chunking(self.chunk_size, self.chunk_overlap)
         for name, provider, url, enabled in (
             ("EMBED", self.embedding_provider, self.embedding_api_url, True),
             ("RERANK", self.reranker_provider, self.reranker_api_url, self.enable_reranker),

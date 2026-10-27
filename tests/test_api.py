@@ -48,13 +48,15 @@ class StubStore:
         return {"id": "kb-1", "name": kb_ref, "description": ""}
 
     def add_file(
-        self, kb_ref: str, source_path: str, title: str | None = None
+        self, kb_ref: str, source_path: str, title: str | None = None,
+        *, chunk_size: int | None = None, chunk_overlap: int | None = None,
     ) -> dict[str, str]:
         self.calls.append(
             (
                 "add_file",
                 (),
-                {"kb_ref": kb_ref, "source_path": source_path, "title": title},
+                {"kb_ref": kb_ref, "source_path": source_path, "title": title,
+                 "chunk_size": chunk_size, "chunk_overlap": chunk_overlap},
             )
         )
         return {"id": "file-1", "kb_id": "kb-1", "title": title or "demo.md"}
@@ -94,12 +96,15 @@ class StubStore:
         *,
         source_path: str | None = None,
         title: str | None = None,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
     ) -> dict[str, str | None]:
         self.calls.append(
             (
                 "update_file",
                 (file_id,),
-                {"source_path": source_path, "title": title},
+                {"source_path": source_path, "title": title,
+                 "chunk_size": chunk_size, "chunk_overlap": chunk_overlap},
             )
         )
         return {"id": file_id, "kb_id": "kb-1", "title": title}
@@ -267,7 +272,8 @@ def test_add_file_passes_expected_arguments() -> None:
     assert store.calls[-1] == (
         "add_file",
         (),
-        {"kb_ref": "产品文档", "source_path": "./demo.md", "title": "演示文档"},
+        {"kb_ref": "产品文档", "source_path": "./demo.md", "title": "演示文档",
+         "chunk_size": None, "chunk_overlap": None},
     )
 
 

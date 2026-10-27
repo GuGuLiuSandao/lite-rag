@@ -100,6 +100,43 @@ API 返回格式与 CLI 保持一致：
 LanceDB 使用 0.40.x，Docker 固定为 0.40.0；该版本原生支持分词后没有有效词项的查询（如纯符号、超长英文词）。
 此时 `fts` 返回空结果，`hybrid` 正常完成融合检索并继续重排。检索错误正常上报。
 
+### 由调用方指定文档切分参数
+
+`POST /file`（JSON 导入）、`POST /file/upload`（multipart 上传）和
+`PATCH /file/{file_id}` 都接受可选的 `chunk_size`、`chunk_overlap`，单位为字符。
+要求 `chunk_size > 0` 且 `0 <= chunk_overlap < chunk_size`；两个参数可单独传入，
+但合并默认值或文档原有参数后也必须满足该约束。
+
+```bash
+curl http://127.0.0.1:8080/api/file/upload \
+  -F 'kb=项目知识库ID' \
+  -F 'file=@./card.md' \
+  -F 'chunk_size=500' \
+  -F 'chunk_overlap=80'
+```
+
+新文档省略参数或传 `null` 时，使用服务端的 `LITE_RAG_CHUNK_SIZE`（默认 800）和
+`LITE_RAG_CHUNK_OVERLAP`（默认 120）。实际使用的参数随文档保存，文件详情和列表会返回这两个字段。
+更新文档时，省略或 `null` 表示沿用该文档的参数，不受后续服务端默认值变化影响。
+只修改标题不会重新切分；明确传入切分参数会重新切分并向量化，可以同时替换 `path`，也可以直接使用已保存的原文：
+
+```bash
+curl -X PATCH http://127.0.0.1:8080/api/file/文档ID \
+  -H 'Content-Type: application/json' \
+  -d '{"chunk_size":500,"chunk_overlap":80}'
+```
+
+重新切分保留文档 ID，但 chunk ID 会变化。只有操作指定的文档会重新生成向量，其他已有文档保持不变。
+该文档旧 chunk 的命中统计会随旧 chunk 删除而清零；较小的切分或较大的重叠会增加 chunk 数量和向量化耗时。
+更新前保留该文档的旧向量，正常异常回滚可直接恢复原向量与 chunk，无需再次调用模型。
+若存储故障导致回滚也失败，会返回错误并保留原文备份（存在替换文件时）。
+重新切分是同步操作；更新期间并发检索可能短暂缺少该文档的结果，断电或进程被强制结束时不保证跨 SQLite、LanceDB 和文件的原子恢复。
+旧文档没有记录历史切分参数，这两个字段返回 `null`；首次重新切分时，未指定的值采用当前服务端默认值并保存。
+切分策略仍优先按空行组合段落；重叠只用于超长段落的强制切分，普通段落边界之间不重叠。
+
+CLI 对应参数为 `file add/update --chunk-size 500 --chunk-overlap 80`。
+这些参数属于文档写入阶段，`/search` 不接受切分参数。
+
 ### 限定可见文档并统一检索
 
 `POST /search` 支持可选的 `file_ids`，对应文件上传或导入结果的 `result.id`：

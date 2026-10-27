@@ -43,6 +43,8 @@ class SQLiteMetadataStore:
                     source_name TEXT NOT NULL,
                     stored_path TEXT NOT NULL,
                     chunk_count INTEGER NOT NULL,
+                    chunk_size INTEGER,
+                    chunk_overlap INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY(kb_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE
@@ -52,6 +54,10 @@ class SQLiteMetadataStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_files_kb_id ON files(kb_id)"
             )
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(files)")}
+            for column in ("chunk_size", "chunk_overlap"):
+                if column not in columns:
+                    connection.execute(f"ALTER TABLE files ADD COLUMN {column} INTEGER")
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS chunks (
@@ -296,8 +302,8 @@ class SQLiteMetadataStore:
                 """
                 INSERT INTO files (
                     id, kb_id, kb_name, title, source_name, stored_path,
-                    chunk_count, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    chunk_count, created_at, updated_at, chunk_size, chunk_overlap
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     file_record["id"],
@@ -309,6 +315,8 @@ class SQLiteMetadataStore:
                     int(file_record["chunk_count"]),
                     file_record["created_at"],
                     file_record["updated_at"],
+                    file_record.get("chunk_size"),
+                    file_record.get("chunk_overlap"),
                 ),
             )
         return file_record
@@ -319,7 +327,8 @@ class SQLiteMetadataStore:
                 """
                 UPDATE files
                 SET kb_id = ?, kb_name = ?, title = ?, source_name = ?, stored_path = ?,
-                    chunk_count = ?, created_at = ?, updated_at = ?
+                    chunk_count = ?, created_at = ?, updated_at = ?,
+                    chunk_size = ?, chunk_overlap = ?
                 WHERE id = ?
                 """,
                 (
@@ -331,6 +340,8 @@ class SQLiteMetadataStore:
                     int(file_record["chunk_count"]),
                     file_record["created_at"],
                     file_record["updated_at"],
+                    file_record.get("chunk_size"),
+                    file_record.get("chunk_overlap"),
                     file_record["id"],
                 ),
             )

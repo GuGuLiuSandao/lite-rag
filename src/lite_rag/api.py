@@ -143,7 +143,11 @@ def create_app() -> FastAPI:
             with WRITE_LOCK:
                 return _ok(
                     store.add_file(
-                        kb_ref=payload.kb, source_path=payload.path, title=payload.title
+                        kb_ref=payload.kb,
+                        source_path=payload.path,
+                        title=payload.title,
+                        chunk_size=payload.chunk_size,
+                        chunk_overlap=payload.chunk_overlap,
                     )
                 )
         except Exception as exc:
@@ -154,6 +158,8 @@ def create_app() -> FastAPI:
         kb: str = Form(...),
         file: UploadFile = File(...),
         title: str | None = Form(default=None),
+        chunk_size: int | None = Form(default=None, gt=0),
+        chunk_overlap: int | None = Form(default=None, ge=0),
         store: LiteRAGStore = Depends(get_store),
     ) -> APIResponse:
         temp_path: Path | None = None
@@ -173,6 +179,8 @@ def create_app() -> FastAPI:
                         kb_ref=kb,
                         source_path=str(temp_path),
                         title=title or file.filename,
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
                     )
                 )
         except Exception as exc:
@@ -236,7 +244,11 @@ def create_app() -> FastAPI:
             with WRITE_LOCK:
                 return _ok(
                     store.update_file(
-                        file_id, source_path=payload.path, title=payload.title
+                        file_id,
+                        source_path=payload.path,
+                        title=payload.title,
+                        chunk_size=payload.chunk_size,
+                        chunk_overlap=payload.chunk_overlap,
                     )
                 )
         except Exception as exc:

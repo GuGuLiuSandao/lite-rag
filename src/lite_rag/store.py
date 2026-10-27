@@ -13,7 +13,7 @@ from typing import Any
 import lancedb
 from lancedb.index import FTS
 
-from .config import LiteRAGConfig
+from .config import LiteRAGConfig, validate_chunking
 from .metadata import SQLiteMetadataStore
 from .models import build_chunk_model
 from .providers import create_embedding, create_reranker
@@ -247,14 +247,38 @@ class LiteRAGStore:
     ) -> list[dict[str, Any]] | dict[str, Any]:
         return self._metadata.get_dashboard(kb_id=kb_id, file_id=file_id)
 
+    def _resolve_chunking(
+        self,
+        file_record: dict[str, Any],
+        chunk_size: int | None,
+        chunk_overlap: int | None,
+    ) -> tuple[int, int]:
+        if chunk_size is None:
+            chunk_size = file_record.get("chunk_size")
+        if chunk_size is None:
+            chunk_size = self.config.chunk_size
+        if chunk_overlap is None:
+            chunk_overlap = file_record.get("chunk_overlap")
+        if chunk_overlap is None:
+            chunk_overlap = self.config.chunk_overlap
+        validate_chunking(chunk_size, chunk_overlap)
+        return chunk_size, chunk_overlap
+
     def add_file(
-        self, kb_ref: str, source_path: str, title: str | None = None
+        self,
+        kb_ref: str,
+        source_path: str,
+        title: str | None = None,
+        *,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
     ) -> dict[str, Any]:
+        chunk_size, chunk_overlap = self._resolve_chunking({}, chunk_size, chunk_overlap)
         kb_id, kb = self._metadata.resolve_kb(kb_ref)
         self._validate_existing_embedding_index()
         path = Path(source_path).expanduser().resolve()
         text = read_text_file(path)
-        chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
+        chunks = chunk_text(text, chunk_size, chunk_overlap)
         if not chunks:
             raise ValueError("File is empty after text extraction")
 
@@ -272,6 +296,8 @@ class LiteRAGStore:
             "source_name": path.name,
             "stored_path": str(stored_path),
             "chunk_count": len(chunks),
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
             "created_at": utc_now(),
             "updated_at": utc_now(),
         }
@@ -304,56 +330,82 @@ class LiteRAGStore:
         *,
         source_path: str | None = None,
         title: str | None = None,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
     ) -> dict[str, Any]:
-        if source_path is not None:
-            self._validate_existing_embedding_index()
         file_record = self._metadata.get_file(file_id)
         kb = self._metadata.get_kb(file_record["kb_id"])
+        previous_record = dict(file_record)
+        reindex = source_path is not None or chunk_size is not None or chunk_overlap is not None
+        if reindex:
+            chunk_size, chunk_overlap = self._resolve_chunking(
+                file_record, chunk_size, chunk_overlap
+            )
+            self._validate_existing_embedding_index()
 
         if title is not None:
             file_record["title"] = title
 
-        previous_record = dict(file_record)
         backup_path: Path | None = None
+        rollback_failed = False
         previous_chunks: list[str] | None = None
         previous_chunk_records = self._metadata.list_file_chunks(file_id)
 
-        if source_path is not None:
-            path = Path(source_path).expanduser().resolve()
+        if reindex:
+            stored_path = self._stored_file_path(file_record)
+            path = stored_path
+            if source_path is not None:
+                path = Path(source_path).expanduser().resolve()
             text = read_text_file(path)
-            chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
+            chunks = chunk_text(text, chunk_size, chunk_overlap)
             if not chunks:
                 raise ValueError("File is empty after text extraction")
 
-            stored_path = self._stored_file_path(file_record)
+            # Keep the original vectors so rollback does not need a working model.
+            table = None
+            previous_index_rows = None
+            scope = f"file_id = '{self._escape_sql(file_id)}'"
+            if self.config.chunks_table_name in self._db.table_names():
+                table = self._get_chunks_table()
+                previous_index_rows = table.search().where(scope).limit(None).to_list()
+
             if stored_path.exists():
-                previous_text = read_text_file(stored_path)
-                previous_chunks = chunk_text(
-                    previous_text,
-                    self.config.chunk_size,
-                    self.config.chunk_overlap,
-                )
-                backup_path = stored_path.with_name(
-                    f"{stored_path.name}.bak-{uuid.uuid4().hex}"
-                )
-                shutil.copy2(stored_path, backup_path)
+                # Restore the actual old chunks, even if server defaults changed.
+                previous_chunks = [item["text"] for item in previous_chunk_records]
+                if not previous_chunks:
+                    old_size, old_overlap = self._resolve_chunking(previous_record, None, None)
+                    previous_chunks = chunk_text(read_text_file(stored_path), old_size, old_overlap)
+                if source_path is not None:
+                    backup_path = stored_path.with_name(
+                        f"{stored_path.name}.bak-{uuid.uuid4().hex}"
+                    )
+                    shutil.copy2(stored_path, backup_path)
 
             try:
-                shutil.copy2(path, stored_path)
-                file_record["source_name"] = path.name
+                if source_path is not None:
+                    shutil.copy2(path, stored_path)
+                    file_record["source_name"] = path.name
                 file_record["chunk_count"] = len(chunks)
+                file_record["chunk_size"] = chunk_size
+                file_record["chunk_overlap"] = chunk_overlap
                 file_record["updated_at"] = utc_now()
                 chunk_records = self._build_chunk_records(kb, file_record, chunks)
                 self._delete_chunks(file_id)
                 self._pending_chunk_records = chunk_records
                 self._index_chunks(kb, file_record, chunks)
                 self._metadata.create_chunks(chunk_records)
+                self._metadata.update_file(file_record)
             except Exception:
-                if backup_path is not None and backup_path.exists():
-                    shutil.copy2(backup_path, stored_path)
-
-                if previous_chunks:
-                    try:
+                try:
+                    if backup_path is not None and backup_path.exists():
+                        shutil.copy2(backup_path, stored_path)
+                    if table is not None:
+                        table.delete(scope)
+                        if previous_index_rows:
+                            table.add(previous_index_rows)
+                        self._metadata.delete_chunks_by_file(file_id)
+                        self._metadata.create_chunks(previous_chunk_records)
+                    elif previous_chunks:
                         self._delete_chunks(file_id)
                         restored_chunks = self._build_chunk_records(
                             kb,
@@ -364,21 +416,31 @@ class LiteRAGStore:
                         self._pending_chunk_records = restored_chunks
                         self._index_chunks(kb, previous_record, previous_chunks)
                         self._metadata.create_chunks(restored_chunks)
-                    except Exception:
-                        pass
+                    self._maintain_fts_index()
+                except Exception as rollback_error:
+                    rollback_failed = True
+                    recovery_path = backup_path or stored_path
+                    logger.exception(
+                        "File update rollback failed for %s; original text: %s",
+                        file_id, recovery_path,
+                    )
+                    raise RuntimeError(
+                        f"File update and rollback failed for {file_id}; "
+                        f"original text: {recovery_path}"
+                    ) from rollback_error
 
                 raise
             finally:
                 self._pending_chunk_records = None
-                if backup_path is not None and backup_path.exists():
+                if backup_path is not None and backup_path.exists() and not rollback_failed:
                     backup_path.unlink()
 
         file_record["kb_name"] = kb["name"]
-        if source_path is None:
+        if not reindex:
             file_record["updated_at"] = utc_now()
-        updated = self._metadata.update_file(file_record)
+            self._metadata.update_file(file_record)
         self._maintain_fts_index()
-        return updated
+        return file_record
 
     def delete_file(self, file_id: str) -> dict[str, Any]:
         return self._delete_file_internal(file_id)
