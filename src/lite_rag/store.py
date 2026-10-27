@@ -5,10 +5,13 @@ import json
 import logging
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 import lancedb
+from lancedb.index import FTS
 
 from .config import LiteRAGConfig
 from .metadata import SQLiteMetadataStore
@@ -34,6 +37,7 @@ class LiteRAGStore:
         self._reranker = None
         self._reranker_unavailable = False
         self._chunks_table = None
+        self._fts_index_lock = RLock()
         self._pending_chunk_records: list[dict[str, Any]] | None = None
 
     def _get_embed_model(self):
@@ -59,26 +63,64 @@ class LiteRAGStore:
         return self._reranker
 
     def _get_chunks_table(self):
-        if self._chunks_table is not None:
+        with self._fts_index_lock:
+            if self._chunks_table is not None:
+                return self._chunks_table
+
+            table_name = self.config.chunks_table_name
+            if table_name in self._db.table_names():
+                self._chunks_table = self._db.open_table(table_name)
+            else:
+                model = self._get_embed_model()
+                dim = model.get_sentence_embedding_dimension()
+                if dim is None:
+                    raise ValueError("Embedding model dimension is unavailable")
+
+                schema = build_chunk_model(dim).to_arrow_schema().with_metadata(
+                    {EMBEDDING_METADATA_KEY: self._embedding_signature()}
+                )
+                self._chunks_table = self._db.create_table(table_name, schema=schema)
+
+            self._maintain_fts_index()
             return self._chunks_table
 
-        existing_tables = set(self._db.table_names())
-        table_name = self.config.chunks_table_name
-        if table_name in existing_tables:
-            self._chunks_table = self._db.open_table(table_name)
-            return self._chunks_table
-
-        model = self._get_embed_model()
-        dim = model.get_sentence_embedding_dimension()
-        if dim is None:
-            raise ValueError("Embedding model dimension is unavailable")
-
-        schema = build_chunk_model(dim).to_arrow_schema().with_metadata(
-            {EMBEDDING_METADATA_KEY: self._embedding_signature()}
+    def _sync_fts_index(self, table) -> None:
+        index = next(
+            (item for item in table.list_indices()
+             if item.index_type == "FTS" and item.columns == ["text"]),
+            None,
         )
-        self._chunks_table = self._db.create_table(table_name, schema=schema)
-        self._chunks_table.create_fts_index("text", replace=True)
-        return self._chunks_table
+        details = {} if index is None else (index.index_details or {})
+        if (
+            index is None
+            or details.get("base_tokenizer") != "icu"
+            or details.get("remove_stop_words") is not False
+        ):
+            # ICU segments Chinese; retaining short terms also keeps C++/C searchable.
+            table.create_index(
+                "text", config=FTS(base_tokenizer="icu", remove_stop_words=False),
+                name="text_idx" if index is None else index.name, replace=True,
+            )
+        elif table.index_stats(index.name).num_unindexed_rows:
+            # optimize() also compacts data and prunes versions. Retain every
+            # version since the Unix epoch; history cleanup is a separate task.
+            retention = datetime.now(timezone.utc) - datetime(1970, 1, 1, tzinfo=timezone.utc)
+            table.optimize(cleanup_older_than=retention)
+
+    def _maintain_fts_index(self) -> None:
+        if self._chunks_table is None:
+            return
+        with self._fts_index_lock:
+            try:
+                self._sync_fts_index(self._chunks_table)
+            except Exception:
+                # Index maintenance must not roll back a successfully stored
+                # document. LanceDB scans pending rows until the next retry.
+                logger.warning(
+                    "FTS index maintenance failed; pending rows remain searchable. "
+                    "Will retry on the next document write or table reopen.",
+                    exc_info=True,
+                )
 
     def _embedding_signature(self) -> bytes:
         identity = [self.config.embedding_provider, self.config.embedding_model_name]
@@ -147,6 +189,7 @@ class LiteRAGStore:
                     where=f"kb_id = '{self._escape_sql(kb['id'])}'",
                     values={"kb_name": kb["name"]},
                 )
+                self._maintain_fts_index()
             except Exception:
                 pass
 
@@ -240,6 +283,7 @@ class LiteRAGStore:
             self._metadata.create_file(file_record)
             file_created = True
             self._metadata.create_chunks(chunk_records)
+            self._maintain_fts_index()
             return file_record
         except Exception:
             self._delete_chunks(file_id)
@@ -332,7 +376,9 @@ class LiteRAGStore:
         file_record["kb_name"] = kb["name"]
         if source_path is None:
             file_record["updated_at"] = utc_now()
-        return self._metadata.update_file(file_record)
+        updated = self._metadata.update_file(file_record)
+        self._maintain_fts_index()
+        return updated
 
     def delete_file(self, file_id: str) -> dict[str, Any]:
         return self._delete_file_internal(file_id)

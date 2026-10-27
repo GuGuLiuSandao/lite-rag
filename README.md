@@ -129,6 +129,16 @@ lite-rag search --kb "项目知识库ID" --file-ids "文件ID-A" "文件ID-B" --
 
 使用本文 Docker 部署时，上述 HTTP 接口路径加 `/api` 前缀。
 
+### 全文倒排索引维护
+
+chunk 的 `text` 字段使用 LanceDB FTS 倒排索引，并使用内置 ICU 分词器支持中文句子中的词语检索。
+保留英文词干匹配，关闭停用词过滤，避免 `C++` 等短技术词被 ICU 的停用词规则丢弃。
+首次打开已有数据表时，会补建缺失索引，或将旧的 `simple` 分词索引一次性重建为 ICU 索引；已有文本、向量和文档 ID 保持不变。
+每篇文档导入、更新及知识库重命名后检查索引覆盖情况，有未索引行时执行增量维护，不会逐个 chunk 重建全表索引。
+维护使用 LanceDB 的 `optimize()`，同时可能合并数据片段；保留 Unix epoch 以来的历史版本，不自动清理历史数据。
+文档删除由 LanceDB 的删除标记同步排除检索结果。
+若索引维护失败，保留已写入文档并记录警告；未索引行仍可扫描检索，在下一次文档写入或重新打开表时重试。
+
 ## Docker Compose 部署
 
 需要 Docker Engine / Docker Desktop 和 Docker Compose 2.24+。

@@ -222,4 +222,5 @@ These conventions are inferred from the current codebase and should be preserved
 - If you add a command, toolchain config, or workflow convention, update this file
 - Preserve current behavior around supported text file types
 - Search `file_ids=None` keeps the existing scope; `file_ids=[]` must match nothing. Apply document filters together with KB filters before recall limits and reranking in every search mode.
+- FTS uses the built-in ICU tokenizer. Backfill/migrate on first table open and maintain once per document write, including KB renames that rewrite chunk rows. Verify indexed/unindexed row counts and the query plan with real LanceDB (`tests/test_fts_index.py`). Index maintenance must preserve document IDs, embeddings, and historical versions; failures log a warning and leave documents searchable for a later retry.
 - Do not assume OCR, PDF parsing, or image parsing support unless the task explicitly adds it
