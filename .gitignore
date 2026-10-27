@@ -19,6 +19,7 @@ temp/
 build/
 dist/
 .lite-rag/
+.backups/
 *.db
 *.sqlite
 *.sqlite3

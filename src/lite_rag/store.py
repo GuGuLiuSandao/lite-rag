@@ -172,9 +172,18 @@ class LiteRAGStore:
     def get_file(self, file_id: str) -> dict[str, Any]:
         return self._metadata.get_file(file_id)
 
+    def _stored_file_path(self, file_record: dict[str, Any]) -> Path:
+        # Resolve against the active root so existing data survives bind mounts
+        # and moving the storage directory between machines.
+        return (
+            self.config.files_dir
+            / file_record["kb_id"]
+            / Path(file_record["stored_path"]).name
+        )
+
     def get_file_content(self, file_id: str) -> dict[str, Any]:
         file_record = self._metadata.get_file(file_id)
-        stored_path = Path(file_record["stored_path"]).expanduser().resolve()
+        stored_path = self._stored_file_path(file_record)
         text = read_text_file(stored_path)
         return {
             "file": file_record,
@@ -272,7 +281,7 @@ class LiteRAGStore:
             if not chunks:
                 raise ValueError("File is empty after text extraction")
 
-            stored_path = Path(file_record["stored_path"])
+            stored_path = self._stored_file_path(file_record)
             if stored_path.exists():
                 previous_text = read_text_file(stored_path)
                 previous_chunks = chunk_text(
@@ -331,7 +340,7 @@ class LiteRAGStore:
     def _delete_file_internal(self, file_id: str) -> dict[str, Any]:
         file_record = self._metadata.get_file(file_id)
         self._delete_chunks(file_id)
-        stored_path = Path(file_record["stored_path"])
+        stored_path = self._stored_file_path(file_record)
         if stored_path.exists():
             stored_path.unlink()
         return self._metadata.delete_file(file_id)

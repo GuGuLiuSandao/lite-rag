@@ -17,6 +17,7 @@ This file is for coding agents that read, modify, test, or review code in this r
 - `skill/local-lite-rag/` — reusable local skill wrapper
 - `README.md` — install, config, and CLI usage examples
 - `pyproject.toml` — package metadata, dependencies, build backend, CLI script
+- `compose.yaml`, `Dockerfile`, `web/Dockerfile`, `web/nginx.conf` — API + static frontend deployment; bind-mounted data at `/data`
 
 ## Rules files status
 
@@ -61,6 +62,17 @@ If unset, storage defaults to `<repo_root>/.lite-rag`.
 - Package root: `src/`
 - Editable install: `pip install -e .`
 - No `Makefile`, `tox`, `nox`, `poetry`, `uv`, or custom build script was found
+
+### Docker deployment
+
+- `docker compose config --quiet` validates configuration (Compose 2.24+)
+- `docker compose up -d --build` builds and starts API and Nginx/static frontend
+- Default URL: `http://127.0.0.1:8080`; API path: `/api/`
+- `LITE_RAG_DATA_DIR` selects the host bind mount (default `./.lite-rag`); container storage is `/data`
+- `LITE_RAG_MODEL_CACHE` may select a host Hugging Face cache; otherwise a named model volume is used
+- Local inference dependencies are installed by default; set `LITE_RAG_INSTALL_LOCAL_MODELS=false` for HTTP-only images
+- When verifying existing mounted data, avoid modifying real documents; use temporary records and clean them up
+- Stored file access must resolve against the active storage root so host paths do not break container reads, updates, or deletion
 
 ### Run the CLI
 
@@ -121,6 +133,7 @@ When changing Python logic:
 
 ### Local dev server restart policy
 
+- When running the Docker deployment, use `docker compose up -d --build` to update the API and frontend instead of starting duplicate development servers
 - After any code change that affects the backend API or the web frontend, agents should default to restarting the relevant local dev servers without waiting for an extra user instruction
 - In this repository, the default expectation is to restart both backend and frontend after modifications unless the user explicitly says not to
 - Backend default restart command: `python -m uvicorn lite_rag.api:app --host 127.0.0.1 --port 8000`

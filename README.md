@@ -96,6 +96,61 @@ API 返回格式与 CLI 保持一致：
 - 成功：`{"ok": true, "result": ...}`
 - 失败：`{"ok": false, "error": "..."}`
 
+## Docker Compose 部署
+
+需要 Docker Engine / Docker Desktop 和 Docker Compose 2.24+。
+在仓库根目录运行（首次使用可先复制 `.env.example` 为 `.env`，保留已有 `.env`）：
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://127.0.0.1:8080/api/health
+```
+
+访问 `http://127.0.0.1:8080`。前端为构建后的静态文件，由 Nginx 提供，
+`/api/*` 反向代理至 FastAPI；API 不额外暴露宿主机端口。
+接口文档地址为 `http://127.0.0.1:8080/api/docs`。
+容器配置了健康检查和 `unless-stopped` 自动重启策略。
+
+### 数据与模型挂载
+
+| 宿主机 / Docker 卷 | 容器目录 | 内容 |
+| --- | --- | --- |
+| `./.lite-rag`（可配置） | `/data` | SQLite 元数据、LanceDB 索引、导入文件副本 |
+| Docker 卷 `lite-rag-models`（可配置） | `/models` | Hugging Face 模型缓存 |
+
+Compose 的宿主机数据目录由 `LITE_RAG_DATA_DIR` 控制，默认挂载仓库现有 `.lite-rag`。
+容器内的 `LITE_RAG_STORAGE_ROOT` 固定为 `/data`，覆盖 `.env` 中的宿主机路径。
+已有文件记录里的旧绝对路径会按当前存储目录解析，无需修改原数据库。
+
+可在仓库 `.env` 中设置：
+
+```env
+LITE_RAG_DATA_DIR=./.lite-rag
+LITE_RAG_WEB_PORT=8080
+LITE_RAG_CPU_THREADS=4
+# 可选：直接复用宿主机已有模型缓存，填绝对路径，不要写 ~。
+# LITE_RAG_MODEL_CACHE=/Users/your-name/.cache/huggingface
+```
+
+默认镜像包含本地 CPU 模型推理依赖，保留现有本地 BGE 模式；核心依赖版本在
+`docker/constraints.txt` 固定。模型权重不打包进镜像，
+首次使用时会下载到 `/models`，或复用已挂载的模型缓存。
+仅使用 HTTP 模型服务时，可设置 `LITE_RAG_INSTALL_LOCAL_MODELS=false` 构建更小的镜像，
+并配置 HTTP 向量化服务，以及 HTTP 重排服务或关闭重排。
+容器调用宿主机上的模型服务时，地址使用 `host.docker.internal` 替代 `127.0.0.1`。
+已有远程向量索引仍需遵循“更换向量模型与已有数据”一节的签名规则，改变接口 URL 会要求重建索引。
+
+```bash
+docker compose logs -f
+docker compose up -d --build  # 更新镜像或应用配置
+docker compose down         # 停止并删除容器，绑定目录和模型卷保留
+```
+
+备份时先停止 API 写入，再备份整个 `LITE_RAG_DATA_DIR`，确保 SQLite、LanceDB 与文件副本一致。
+`docker compose down -v` 会额外删除 Docker 模型缓存卷，但不会删除宿主机绑定的数据目录。
+浏览器上传文件可直接使用；JSON `/api/file` 的 `path` 必须是容器可见路径。
+
 ## 配置
 
 CLI 和 API 都会自动读取仓库根目录的 `.env`，系统环境变量优先。首次配置可复制：

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,63 @@ import pytest
 from lite_rag.config import LiteRAGConfig
 from lite_rag.metadata import SQLiteMetadataStore
 from lite_rag.store import LiteRAGStore
+
+
+@pytest.mark.parametrize("operation", ["read", "update", "delete", "rollback"])
+def test_stored_files_follow_relocated_storage_root(tmp_path, operation) -> None:
+    old_root = tmp_path / "old"
+    config = LiteRAGConfig(
+        storage_root=old_root,
+        db_dir=old_root / "db",
+        files_dir=old_root / "files",
+        metadata_db_path=old_root / "metadata.sqlite3",
+        enable_reranker=False,
+    )
+    old_store = LiteRAGStore(config)
+    old_store._index_chunks = lambda *_args: None
+    kb = old_store.create_kb("mounted-data")
+    source = tmp_path / "original.md"
+    source.write_text("original content", encoding="utf-8")
+    record = old_store.add_file(kb["id"], str(source))
+
+    new_root = tmp_path / "mounted"
+    shutil.copytree(old_root, new_root)
+    original_path = Path(record["stored_path"])
+    original_path.write_text("outside mount", encoding="utf-8")
+    mounted_path = new_root / "files" / kb["id"] / original_path.name
+    store = LiteRAGStore(replace(
+        config,
+        storage_root=new_root,
+        db_dir=new_root / "db",
+        files_dir=new_root / "files",
+        metadata_db_path=new_root / "metadata.sqlite3",
+    ))
+    store._index_chunks = lambda *_args: None
+    store._delete_chunks = store._metadata.delete_chunks_by_file
+
+    if operation == "read":
+        assert store.get_file_content(record["id"])["content"] == "original content"
+    elif operation == "delete":
+        store.delete_file(record["id"])
+        assert not mounted_path.exists()
+        assert store.list_files() == []
+    else:
+        replacement = tmp_path / "replacement.md"
+        replacement.write_text("new content", encoding="utf-8")
+        if operation == "rollback":
+            def fail_replacement(_kb, file_record, _chunks):
+                if file_record["source_name"] == "replacement.md":
+                    raise RuntimeError("index failed")
+
+            store._index_chunks = fail_replacement
+            with pytest.raises(RuntimeError, match="index failed"):
+                store.update_file(record["id"], source_path=str(replacement))
+            assert mounted_path.read_text(encoding="utf-8") == "original content"
+        else:
+            store.update_file(record["id"], source_path=str(replacement))
+            assert mounted_path.read_text(encoding="utf-8") == "new content"
+
+    assert original_path.read_text(encoding="utf-8") == "outside mount"
 
 
 def test_metadata_store_migrates_legacy_manifest(tmp_path) -> None:
